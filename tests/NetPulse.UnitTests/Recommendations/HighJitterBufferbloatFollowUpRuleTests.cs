@@ -11,7 +11,7 @@ public class HighJitterBufferbloatFollowUpRuleTests
     [Fact]
     public void Evaluate_JitterAboveThreshold_Fires()
     {
-        var match = _rule.Evaluate(Stats(jitterMs: 31), Finding(DiagnosticConfidence.Probable));
+        var match = _rule.Evaluate(Evidence(Stats(jitterMs: 31), Finding(DiagnosticConfidence.Probable)));
 
         Assert.NotNull(match);
         Assert.Equal("recommend.high-jitter-bufferbloat-followup", match!.Descriptor.Id);
@@ -20,7 +20,7 @@ public class HighJitterBufferbloatFollowUpRuleTests
     [Fact]
     public void Evaluate_JitterAtOrBelowThreshold_DoesNotFire()
     {
-        var match = _rule.Evaluate(Stats(jitterMs: 30), Finding(DiagnosticConfidence.Probable));
+        var match = _rule.Evaluate(Evidence(Stats(jitterMs: 30), Finding(DiagnosticConfidence.Probable)));
 
         Assert.Null(match);
     }
@@ -28,7 +28,7 @@ public class HighJitterBufferbloatFollowUpRuleTests
     [Fact]
     public void Evaluate_HypothesisConfidence_NeverFires()
     {
-        var match = _rule.Evaluate(Stats(jitterMs: 100), Finding(DiagnosticConfidence.Hypothesis));
+        var match = _rule.Evaluate(Evidence(Stats(jitterMs: 100), Finding(DiagnosticConfidence.Hypothesis)));
 
         Assert.Null(match);
     }
@@ -36,7 +36,7 @@ public class HighJitterBufferbloatFollowUpRuleTests
     [Fact]
     public void Evaluate_OnlyEverRecommendsAFollowUpTest_NeverAChange()
     {
-        var match = _rule.Evaluate(Stats(jitterMs: 50), Finding(DiagnosticConfidence.Probable));
+        var match = _rule.Evaluate(Evidence(Stats(jitterMs: 50), Finding(DiagnosticConfidence.Probable)));
 
         Assert.Contains("bufferbloat", match!.Descriptor.Title, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(match.Descriptor.RequiredPermissions);

@@ -11,7 +11,7 @@ public class InsufficientSamplesRuleTests
     [Fact]
     public void Evaluate_HypothesisConfidence_Fires()
     {
-        var match = _rule.Evaluate(Stats(sampleCount: 5), Finding(DiagnosticConfidence.Hypothesis));
+        var match = _rule.Evaluate(Evidence(Stats(sampleCount: 5), Finding(DiagnosticConfidence.Hypothesis)));
 
         Assert.NotNull(match);
         Assert.Equal("recommend.insufficient-samples", match!.Descriptor.Id);
@@ -25,7 +25,7 @@ public class InsufficientSamplesRuleTests
     [InlineData(DiagnosticConfidence.Healthy)]
     public void Evaluate_AnyOtherConfidence_DoesNotFire(DiagnosticConfidence confidence)
     {
-        var match = _rule.Evaluate(Stats(), Finding(confidence));
+        var match = _rule.Evaluate(Evidence(Stats(), Finding(confidence)));
 
         Assert.Null(match);
     }
@@ -33,7 +33,7 @@ public class InsufficientSamplesRuleTests
     [Fact]
     public void Evaluate_NeverProposesAChange()
     {
-        var match = _rule.Evaluate(Stats(sampleCount: 5), Finding(DiagnosticConfidence.Hypothesis));
+        var match = _rule.Evaluate(Evidence(Stats(sampleCount: 5), Finding(DiagnosticConfidence.Hypothesis)));
 
         Assert.Contains("Not applicable", match!.Descriptor.RollbackMethod);
         Assert.Empty(match.Descriptor.RequiredPermissions);

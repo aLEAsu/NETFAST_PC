@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NetPulse.App"
         mc:Ignorable="d"
-        Title="NetPulse Optimizer - Diagnostics &amp; Recommendations (Phase 3-4)" Height="760" Width="1150"
+        Title="NetPulse Optimizer" Height="800" Width="1150"
         Background="#1E1F24">
     <Window.Resources>
         <Style TargetType="TextBlock">
@@ -37,34 +37,52 @@
 
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="NetPulse Optimizer" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Diagnostics + recommendations. Recommendations are informational only - no network or system setting is ever modified by this build."
+            <TextBlock Text="Diagnostics + recommendations. Most recommendations are informational only. One (DNS servers) can be applied below - it always asks for confirmation first and requires a Windows UAC approval before anything changes."
                        FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0"/>
         </StackPanel>
 
         <Border Grid.Row="1" Background="#26272E" Padding="12" CornerRadius="4" Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Targets (comma-separated):" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBox Text="{Binding TargetsText, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"/>
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Profile:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}" Width="160" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ProfileFocusText}" VerticalAlignment="Center" Margin="12,0,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap" MaxWidth="600"/>
+                </StackPanel>
 
-                <TextBlock Text="Samples per target:" VerticalAlignment="Center" Margin="16,0,8,0"/>
-                <TextBox Text="{Binding SampleCount, UpdateSourceTrigger=PropertyChanged}" Width="60" VerticalAlignment="Center"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="Targets (comma-separated):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox Text="{Binding TargetsText, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"/>
 
-                <Button Content="Run diagnostic" Command="{Binding RunDiagnosticCommand}" Margin="16,0,0,0" Padding="12,4"/>
-                <Button Content="Cancel" Command="{Binding CancelDiagnosticCommand}" Margin="8,0,0,0" Padding="12,4"/>
-                <Button Content="Refresh adapters" Command="{Binding LoadAdaptersCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                    <TextBlock Text="Samples per target:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                    <TextBox Text="{Binding SampleCount, UpdateSourceTrigger=PropertyChanged}" Width="60" VerticalAlignment="Center"/>
+
+                    <Button Content="Run diagnostic" Command="{Binding RunDiagnosticCommand}" Margin="16,0,0,0" Padding="12,4"/>
+                    <Button Content="Cancel" Command="{Binding CancelDiagnosticCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                    <Button Content="Refresh adapters" Command="{Binding LoadAdaptersCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 
-        <GroupBox Grid.Row="2" Header="Network adapters (read-only inventory)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Adapters}"/>
+        <GroupBox Grid.Row="2" Header="Network adapters (read-only inventory - select one to enable applying a DNS recommendation below)" Margin="0,0,0,12" Foreground="#E8E8EA">
+            <DataGrid ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" SelectionMode="Single" SelectionUnit="FullRow"/>
         </GroupBox>
 
         <GroupBox Grid.Row="3" Header="Diagnostic findings (confidence-labeled; not a guarantee of cause)" Margin="0,0,0,12" Foreground="#E8E8EA">
             <DataGrid ItemsSource="{Binding Findings}"/>
         </GroupBox>
 
-        <GroupBox Grid.Row="4" Header="Recommendations (informational only - nothing is applied automatically)" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Recommendations}"/>
+        <GroupBox Grid.Row="4" Header="Recommendations - nothing is applied automatically; only the DNS one can be applied, and only after you confirm and approve a UAC prompt" Foreground="#E8E8EA">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <DataGrid Grid.Row="0" ItemsSource="{Binding Recommendations}"/>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                    <Button Content="Apply suggested DNS servers (1.1.1.1, 8.8.8.8)" Command="{Binding ApplyDnsRecommendationCommand}" Padding="12,4"/>
+                    <Button Content="Rollback DNS change" Command="{Binding RollbackDnsCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                </StackPanel>
+            </Grid>
         </GroupBox>
 
         <TextBlock Grid.Row="5" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic" Foreground="#B5B5BD"/>

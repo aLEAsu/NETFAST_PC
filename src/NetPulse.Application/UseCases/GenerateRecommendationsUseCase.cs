@@ -22,7 +22,10 @@ public sealed class GenerateRecommendationsUseCase
         var recommendations = new List<TriggeredRecommendation>();
 
         foreach (var result in diagnosticResults)
-            recommendations.AddRange(_engine.Evaluate(result.Statistics, result.Finding));
+        {
+            var evidence = new NetworkEvidence(result.Statistics, result.Finding, result.TcpCheck, result.DnsCheck);
+            recommendations.AddRange(_engine.Evaluate(evidence));
+        }
 
         return recommendations;
     }

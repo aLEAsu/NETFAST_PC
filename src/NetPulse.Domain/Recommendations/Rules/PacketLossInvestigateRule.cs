@@ -1,5 +1,4 @@
 using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 
 namespace NetPulse.Domain.Recommendations.Rules;
@@ -29,8 +28,10 @@ public sealed class PacketLossInvestigateRule : IRecommendationRule
         ReferenceDocumentation: new[] { "Project brief §2.6 and §12: do not attribute loss to the PC without ruling out router/ISP/remote-target causes." },
         KnownLimitations: new[] { "ICMP loss does not confirm loss of this machine's own application traffic.", "The remote target or an intermediate hop may be the actual cause." });
 
-    public TriggeredRecommendation? Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
+        var (statistics, finding) = (evidence.Statistics, evidence.Finding);
+
         if (finding.Confidence == DiagnosticConfidence.Hypothesis)
             return null;
 

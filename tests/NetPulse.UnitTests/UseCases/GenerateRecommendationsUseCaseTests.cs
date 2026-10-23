@@ -15,8 +15,8 @@ public class GenerateRecommendationsUseCaseTests
 
         var results = new[]
         {
-            new DiagnosticRunResult(Stats(target: "1.1.1.1"), Finding(DiagnosticConfidence.Healthy)),
-            new DiagnosticRunResult(Stats(target: "8.8.8.8", lossPercent: 10), Finding(DiagnosticConfidence.Probable)),
+            new DiagnosticRunResult(Stats(target: "1.1.1.1"), Finding(DiagnosticConfidence.Healthy), TcpOk("1.1.1.1"), DnsNotApplicable("1.1.1.1")),
+            new DiagnosticRunResult(Stats(target: "8.8.8.8", lossPercent: 10), Finding(DiagnosticConfidence.Probable), TcpOk("8.8.8.8"), DnsNotApplicable("8.8.8.8")),
         };
 
         var recommendations = useCase.Run(results);

@@ -24,6 +24,18 @@ public class DiagnosticPipelinePerformanceTests
             Task.FromResult(new LatencySample(target, DateTimeOffset.UtcNow, Responded: true, RoundTripTime: TimeSpan.FromMilliseconds(15)));
     }
 
+    private sealed class InstantFakeTcpProbeService : ITcpConnectProbeService
+    {
+        public Task<TcpConnectSample> ProbeOnceAsync(string target, int port, TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult(new TcpConnectSample(target, port, DateTimeOffset.UtcNow, Connected: true, TimeSpan.FromMilliseconds(10), Error: null));
+    }
+
+    private sealed class InstantFakeDnsProbeService : IDnsResolutionProbeService
+    {
+        public Task<DnsResolutionSample> ProbeOnceAsync(string hostname, TimeSpan timeout, CancellationToken cancellationToken) =>
+            Task.FromResult(new DnsResolutionSample(hostname, DateTimeOffset.UtcNow, Resolved: true, TimeSpan.FromMilliseconds(5), new[] { "1.2.3.4" }, Error: null));
+    }
+
     private sealed class NoOpHistoryRepository : IDiagnosticHistoryRepository
     {
         public Task SaveAsync(LatencyStatistics statistics, CancellationToken cancellationToken) => Task.CompletedTask;
@@ -59,10 +71,13 @@ public class DiagnosticPipelinePerformanceTests
             TimeSpan.FromMilliseconds(20), TimeSpan.FromMilliseconds(25), TimeSpan.FromMilliseconds(30),
             TimeSpan.FromMilliseconds(3), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         var finding = new DiagnosticFinding("test", "test", DiagnosticConfidence.Healthy, "test", Array.Empty<string>());
+        var tcpCheck = new TcpConnectSample("1.1.1.1", 443, DateTimeOffset.UtcNow, true, TimeSpan.FromMilliseconds(10), null);
+        var dnsCheck = DnsResolutionSample.NotApplicable("1.1.1.1");
+        var evidence = new NetworkEvidence(stats, finding, tcpCheck, dnsCheck);
 
         var stopwatch = Stopwatch.StartNew();
         for (int i = 0; i < 1000; i++)
-            engine.Evaluate(stats, finding);
+            engine.Evaluate(evidence);
         stopwatch.Stop();
 
         var averageMicroseconds = stopwatch.Elapsed.TotalMicroseconds / 1000;
@@ -75,7 +90,7 @@ public class DiagnosticPipelinePerformanceTests
         // Network delay is intentional and configured (IntervalBetweenSamples) - this test
         // isolates the use case's OWN overhead by setting that interval to zero and using an
         // instant fake probe, so total elapsed time reflects only this project's code.
-        var useCase = new ConnectionDiagnosticUseCase(new InstantFakeProbeService(), new NoOpHistoryRepository());
+        var useCase = new ConnectionDiagnosticUseCase(new InstantFakeProbeService(), new InstantFakeTcpProbeService(), new InstantFakeDnsProbeService(), new NoOpHistoryRepository());
         var options = new DiagnosticOptions(new[] { "1.1.1.1", "8.8.8.8" }, SampleCount: 20, IntervalBetweenSamples: TimeSpan.Zero);
 
         // This is a single-shot measurement (unlike the averaged-over-many-iterations tests

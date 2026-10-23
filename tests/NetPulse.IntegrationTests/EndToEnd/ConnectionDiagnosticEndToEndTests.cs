@@ -19,6 +19,8 @@ public class ConnectionDiagnosticEndToEndTests : IDisposable
         _databasePath = Path.Combine(Path.GetTempPath(), $"netpulse-e2e-{Guid.NewGuid():N}.db");
         _useCase = new ConnectionDiagnosticUseCase(
             new IcmpLatencyProbeService(),
+            new TcpConnectProbeService(),
+            new DnsResolutionProbeService(),
             new SqliteDiagnosticHistoryRepository(_databasePath));
     }
 

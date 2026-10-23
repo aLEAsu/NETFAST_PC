@@ -11,7 +11,7 @@ public class HighMedianLatencyRuleTests
     [Fact]
     public void Evaluate_MedianAboveThreshold_Fires()
     {
-        var match = _rule.Evaluate(Stats(medianMs: 101, jitterMs: 2), Finding(DiagnosticConfidence.Probable));
+        var match = _rule.Evaluate(Evidence(Stats(medianMs: 101, jitterMs: 2), Finding(DiagnosticConfidence.Probable)));
 
         Assert.NotNull(match);
         Assert.Equal("recommend.high-median-latency", match!.Descriptor.Id);
@@ -20,7 +20,7 @@ public class HighMedianLatencyRuleTests
     [Fact]
     public void Evaluate_MedianAtOrBelowThreshold_DoesNotFire()
     {
-        var match = _rule.Evaluate(Stats(medianMs: 100, jitterMs: 2), Finding(DiagnosticConfidence.Probable));
+        var match = _rule.Evaluate(Evidence(Stats(medianMs: 100, jitterMs: 2), Finding(DiagnosticConfidence.Probable)));
 
         Assert.Null(match);
     }
@@ -28,7 +28,7 @@ public class HighMedianLatencyRuleTests
     [Fact]
     public void Evaluate_HypothesisConfidence_NeverFires()
     {
-        var match = _rule.Evaluate(Stats(medianMs: 500), Finding(DiagnosticConfidence.Hypothesis));
+        var match = _rule.Evaluate(Evidence(Stats(medianMs: 500), Finding(DiagnosticConfidence.Hypothesis)));
 
         Assert.Null(match);
     }
@@ -36,7 +36,7 @@ public class HighMedianLatencyRuleTests
     [Fact]
     public void Evaluate_NeverBlamesThePcForDistanceLatency()
     {
-        var match = _rule.Evaluate(Stats(medianMs: 300), Finding(DiagnosticConfidence.Healthy));
+        var match = _rule.Evaluate(Evidence(Stats(medianMs: 300), Finding(DiagnosticConfidence.Healthy)));
 
         Assert.Contains("distance", match!.Descriptor.Title, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(match.Descriptor.RequiredPermissions);

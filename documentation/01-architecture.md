@@ -1,11 +1,14 @@
 # NetPulse Optimizer — Technical Design
 
-Status: **Phases 3, 4, and 5 (diagnostics + recommendations + privileged agent) implemented
-and building.** Phase 5 adds the first real, applyable optimization
-(`SetAdapterDnsServersAction`) with a genuine elevation boundary - but its write path has
-**never been executed against a real machine** by the automated session that wrote it; see
-§10. Everything below that is not reflected in `src/` is a proposal for later work, labeled
-as such.
+Status: **Phases 3-7 implemented and building**, plus a post-Phase-7 completion pass (TCP/DNS
+probes, Profiles, and UI wiring for the one real action). See
+`02-roadmap-and-limitations.md` for the phase-by-phase table and
+`05-code-audit-and-recommendations.md` for the latest full audit - both are more current than
+some of the section-level detail below, which is left in place as a historical record of each
+phase's own state rather than continuously rewritten. `SetAdapterDnsServersAction`'s write
+path has **never been executed against a real machine** by any automated session; see §10 -
+that has not changed even though it is now UI-reachable. Everything below that is not
+reflected in `src/` is a proposal for later work, labeled as such.
 
 ## 1. Executive summary
 
@@ -298,9 +301,12 @@ elevation.
 
 This is not a gap to "get around" later with a different kind of test - an elevated, real
 system-modifying action verified by an unattended coding session defeats the purpose of
-requiring a UAC prompt at all. The correct verification is: build the solution, run it as a
-normal user, trigger the DNS action from a future UI entry point (not yet wired, see §8), and
-personally watch the UAC prompt, the result, and the rollback.
+requiring a UAC prompt at all. **As of the post-Phase-7 completion pass, the UI entry point
+exists**: `DashboardViewModel.ApplyDnsRecommendationAsync`, reached by selecting an adapter
+and clicking "Apply suggested DNS servers" once the `SlowDnsResolutionRule` recommendation
+fires (§5a). The correct verification is: build the solution, run it as a normal user,
+select an adapter, trigger that command, and personally watch the confirmation dialog, the
+UAC prompt, the result, and the rollback button. No automated session should do this.
 
 ### Helper deployment: resolved by the Phase 7 installer
 
@@ -322,8 +328,8 @@ dotnet test tests/NetPulse.IntegrationTests/NetPulse.IntegrationTests.csproj
 dotnet run --project src/NetPulse.App/NetPulse.App.csproj
 ```
 
-Verified in this environment: solution builds with 0 errors/0 warnings, 88/88 unit tests pass,
-28/28 integration tests pass against the real adapter stack/ICMP/SQLite/WMI (read-only), 5/5
+Verified in this environment: solution builds with 0 errors/0 warnings, 104/104 unit tests pass,
+35/35 integration tests pass against the real adapter stack/ICMP/TCP/DNS/SQLite/WMI (read-only), 5/5
 safety-lifecycle tests pass, 4/4 performance benchmarks pass, and the app launches and reaches
 the dashboard (`MainWindowTitle` confirmed via a running process check, idle CPU/RAM measured
 in `03-phase6-security-performance.md`). Not verified: the elevated write path described in

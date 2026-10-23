@@ -1,5 +1,4 @@
 using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 
 namespace NetPulse.Domain.Recommendations.Rules;
@@ -27,8 +26,10 @@ public sealed class HealthyNoActionRule : IRecommendationRule
         ReferenceDocumentation: new[] { "Project brief §7 and §H: a profile may recommend no change when the current state is already adequate." },
         KnownLimitations: new[] { "Reflects only the target and time window just measured, not a guarantee of future stability." });
 
-    public TriggeredRecommendation? Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
+        var (statistics, finding) = (evidence.Statistics, evidence.Finding);
+
         if (finding.Confidence != DiagnosticConfidence.Healthy)
             return null;
 

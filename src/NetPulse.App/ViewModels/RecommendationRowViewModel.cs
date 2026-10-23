@@ -4,6 +4,14 @@ namespace NetPulse.App.ViewModels;
 
 public sealed class RecommendationRowViewModel
 {
+    /// <summary>
+    /// The one recommendation Id this build knows how to actually apply - the link between
+    /// Phase 4's recommendation engine and Phase 5's privileged action is by this naming
+    /// convention, not an object reference, because Domain cannot depend on PrivilegedAgent
+    /// (see SlowDnsResolutionRule's own doc comment).
+    /// </summary>
+    public const string ApplyableDnsRecommendationId = "recommend.slow-dns-resolution";
+
     public RecommendationRowViewModel(TriggeredRecommendation recommendation)
     {
         var descriptor = recommendation.Descriptor;
@@ -15,6 +23,7 @@ public sealed class RecommendationRowViewModel
         Explanation = recommendation.TriggerExplanation;
         NextStep = descriptor.VerificationMethod;
         Limitations = descriptor.KnownLimitations.Length > 0 ? string.Join(" | ", descriptor.KnownLimitations) : "-";
+        CanApply = descriptor.Id == ApplyableDnsRecommendationId;
     }
 
     public string Target { get; }
@@ -24,4 +33,7 @@ public sealed class RecommendationRowViewModel
     public string Explanation { get; }
     public string NextStep { get; }
     public string Limitations { get; }
+
+    /// <summary>True only for the one recommendation this build can actually offer to apply.</summary>
+    public bool CanApply { get; }
 }

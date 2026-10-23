@@ -7,6 +7,7 @@ using NetPulse.Application.UseCases;
 using NetPulse.Domain.Recommendations;
 using NetPulse.Infrastructure.Windows.Network;
 using NetPulse.Persistence;
+using NetPulse.PrivilegedAgent;
 
 namespace NetPulse.App;
 
@@ -18,6 +19,20 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        // Defense in depth: LoadAdaptersAsync and RunDiagnosticAsync already catch their own
+        // exceptions and show a status message, but this is the backstop for anything that
+        // doesn't - without it, any uncaught exception on the UI thread crashes the whole
+        // app silently instead of telling the user what happened.
+        DispatcherUnhandledException += (_, args) =>
+        {
+            MessageBox.Show(
+                $"An unexpected error occurred and has been caught before it could crash the app:\n\n{args.Exception.Message}",
+                "NetPulse Optimizer - Unexpected error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            args.Handled = true;
+        };
+
         var services = new ServiceCollection();
 
         var dbPath = Path.Combine(
@@ -27,10 +42,21 @@ public partial class App : System.Windows.Application
 
         services.AddSingleton<INetworkAdapterInventoryService, NetworkAdapterInventoryService>();
         services.AddSingleton<ILatencyProbeService, IcmpLatencyProbeService>();
+        services.AddSingleton<ITcpConnectProbeService, TcpConnectProbeService>();
+        services.AddSingleton<IDnsResolutionProbeService, DnsResolutionProbeService>();
         services.AddSingleton<IDiagnosticHistoryRepository>(_ => new SqliteDiagnosticHistoryRepository(dbPath));
         services.AddSingleton<ConnectionDiagnosticUseCase>();
         services.AddSingleton(_ => new RecommendationEngine(DefaultRecommendationRules.Create()));
         services.AddSingleton<GenerateRecommendationsUseCase>();
+
+        // Phase 5's privileged action: registered so DashboardViewModel can construct
+        // SetAdapterDnsServersAction on demand (it needs per-use adapter id + server list
+        // that only exist once the user picks a recommendation, so it cannot itself be a
+        // singleton - see DashboardViewModel.ApplyDnsRecommendationAsync).
+        services.AddSingleton<IAdapterDnsConfigurationReader, WmiAdapterDnsConfigurationReader>();
+        services.AddSingleton<IElevatedOperationLauncher, ElevatedHelperOperationLauncher>();
+        services.AddSingleton<IPrivilegedOperationAuditLog>(_ => new SqlitePrivilegedOperationAuditLog(dbPath));
+
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<MainWindow>();
 

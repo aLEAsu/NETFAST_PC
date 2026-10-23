@@ -1,5 +1,4 @@
 using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 
 namespace NetPulse.Domain.Recommendations.Rules;
@@ -29,8 +28,10 @@ public sealed class HighJitterBufferbloatFollowUpRule : IRecommendationRule
         ReferenceDocumentation: new[] { "Project brief Module E (bufferbloat diagnosis): requires a dedicated load test, not jitter-at-rest alone." },
         KnownLimitations: new[] { "The bufferbloat load test itself is not implemented in this codebase yet.", "High jitter can also come from Wi-Fi interference or a busy remote target, not only local queuing." });
 
-    public TriggeredRecommendation? Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
+        var (statistics, finding) = (evidence.Statistics, evidence.Finding);
+
         if (finding.Confidence == DiagnosticConfidence.Hypothesis)
             return null;
 

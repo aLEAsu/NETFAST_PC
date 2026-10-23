@@ -7,6 +7,7 @@ public sealed class AdapterRowViewModel
 {
     public AdapterRowViewModel(NetworkAdapterInfo info)
     {
+        Id = info.Id;
         Name = info.Name;
         Description = info.Description;
         Kind = info.Kind.ToString();
@@ -20,6 +21,7 @@ public sealed class AdapterRowViewModel
         Mtu = info.Mtu > 0 ? info.Mtu.ToString() : "-";
     }
 
+    public string Id { get; }
     public string Name { get; }
     public string Description { get; }
     public string Kind { get; }

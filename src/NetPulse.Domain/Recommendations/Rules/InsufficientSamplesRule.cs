@@ -1,5 +1,4 @@
 using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 
 namespace NetPulse.Domain.Recommendations.Rules;
@@ -22,8 +21,10 @@ public sealed class InsufficientSamplesRule : IRecommendationRule
         ReferenceDocumentation: new[] { "Project brief §7: the engine must not attribute effects without sufficient samples." },
         KnownLimitations: new[] { "Does not itself fix anything; it only improves the confidence of the next diagnostic." });
 
-    public TriggeredRecommendation? Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
+        var (statistics, finding) = (evidence.Statistics, evidence.Finding);
+
         if (finding.Confidence != DiagnosticConfidence.Hypothesis)
             return null;
 

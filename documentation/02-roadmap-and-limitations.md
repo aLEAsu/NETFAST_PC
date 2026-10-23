@@ -12,6 +12,40 @@
 | 6. Security & performance validation | **Done for what's measurable here** — security audit, real idle CPU/RAM measurement, diagnostic-pipeline CPU benchmarks, traffic-bound validation, one real regression found and fixed. FPS/game-impact protocol not run (no game/PresentMon available). See `03-phase6-security-performance.md`. |
 | 7. Distribution (installer, signing) | **Implemented and tested** — real WiX MSI, per-user install (no UAC needed to install/uninstall), verified install/upgrade/uninstall cycle, signing procedure established and exercised with a self-signed test certificate. No CA-issued certificate exists. See `04-phase7-distribution.md`. |
 
+## Post-Phase-7 completion pass
+
+Requested explicitly: complete what was started, finish the modules that were unstarted or
+partial where realistically achievable, audit the whole codebase, and recommend next steps.
+See `05-code-audit-and-recommendations.md` for the full audit; summary of what changed:
+
+- **Phase 4 ↔ Phase 5 gap closed.** `SetAdapterDnsServersAction` is now reachable from the
+  running app - select an adapter, run a diagnostic, and if the new DNS-resolution rule
+  fires, an "Apply suggested DNS servers" button appears. **This means the elevated write
+  path is no longer only theoretical** - it is one click plus one UAC approval away from
+  running for real. It is still true that no automated session has executed it; it is no
+  longer true that nothing in the UI could reach it. See `01-architecture.md` §10 and §12.
+- **Module B extended.** Added a real TCP-connect confirmation and a real DNS-resolution
+  probe per diagnostic run (`ITcpConnectProbeService`, `IDnsResolutionProbeService`,
+  `TcpConnectProbeService`, `DnsResolutionProbeService`). `ConnectionDiagnosticUseCase.Classify`
+  now distinguishes "ICMP filtered, but reachable" from "actually down" using the TCP result -
+  closing the limitation this project's documentation repeated at every phase since Phase 3.
+- **A new recommendation rule** (`SlowDnsResolutionRule`) fires on slow/failed DNS
+  resolution and is the one recommendation this build can actually offer to apply.
+- **Module H (Profiles) implemented.** `DiagnosticProfile`/`DiagnosticProfileCatalog` -
+  six profiles (General, Gaming, Downloads, VideoCalls, Conservative, Maintenance), each
+  adjusting sample count/interval/timeout and which recommendation ids are shown first.
+  No profile applies a change by itself.
+- **Two real bugs found by review and fixed**, independent of the above: `LoadAdaptersAsync`
+  had no exception handling and ran from an effectively-`async void` context (a transient
+  WMI/network-enumeration failure would have crashed the whole app); and a
+  `DispatcherUnhandledException` backstop was missing entirely. Both fixed - see
+  `05-code-audit-and-recommendations.md`.
+- **Still not implemented**, by deliberate scope decision (see
+  `06-continuation-brief.md` for the detailed next-session plan): bufferbloat active-load
+  testing (Module E), per-process bandwidth accounting (Module F), pktmon/ETW advanced
+  diagnostics (Module G), advanced NIC properties (RSS/offloads/etc., part of Module C),
+  WinUI 3 migration, and a CA-issued signing certificate.
+
 ## Phase 4 scope note: "simulation of changes"
 
 The brief's Phase 4 (§16) asks for a recommendation engine plus "simulación de cambios"
@@ -135,14 +169,16 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
   reuse/mirror the same starting cutoffs as `ConnectionDiagnosticUseCase.Classify`. They are a
   reasonable default, not a validated standard - see the note above about fixed classification
   thresholds.
-- **No rule ever recommends a Windows setting change.** All five Phase 4 rules
+- **Only one rule recommends a Windows setting change.** Of the six rules
   (`InsufficientSamplesRule`, `PacketLossInvestigateRule`, `HighJitterBufferbloatFollowUpRule`,
-  `HighMedianLatencyRule`, `HealthyNoActionRule`) only recommend gathering more evidence,
-  investigating outside this PC, or doing nothing. Phase 5's `SetAdapterDnsServersAction` is
-  not yet reachable from any Phase 4 rule or from the UI - the two are not cross-linked yet.
-- **The elevated write path is unverified.** See the Phase 5 scope note above. Do not treat
-  `SetAdapterDnsServersAction.ApplyAsync`/`RollbackAsync` as proven to work against a real
-  adapter until a person has run them once, deliberately, and watched the result.
+  `HighMedianLatencyRule`, `SlowDnsResolutionRule`, `HealthyNoActionRule`), only
+  `SlowDnsResolutionRule` has an applyable action behind it (`SetAdapterDnsServersAction`,
+  reachable from the dashboard - see the post-Phase-7 note above). The other five remain
+  informational by design.
+- **The elevated write path is unverified, but now UI-reachable.** No automated session has
+  executed `SetAdapterDnsServersAction.ApplyAsync`/`RollbackAsync` against a real adapter.
+  Unlike earlier phases, a person now reaches that path with one click plus one UAC approval
+  from the running app - there is no longer a missing wiring step between them and it.
 - **Elevated helper deployment: resolved by the installer.** `ElevatedHelperOperationLauncher`
   expects `NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`; as of Phase 7,
   `installer/build.ps1` publishes both and merges them into one payload directory before

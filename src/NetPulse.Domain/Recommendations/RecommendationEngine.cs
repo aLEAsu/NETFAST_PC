@@ -1,6 +1,3 @@
-using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
-
 namespace NetPulse.Domain.Recommendations;
 
 /// <summary>
@@ -21,13 +18,13 @@ public sealed class RecommendationEngine
         _rules = rules;
     }
 
-    public IReadOnlyList<TriggeredRecommendation> Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public IReadOnlyList<TriggeredRecommendation> Evaluate(NetworkEvidence evidence)
     {
         var triggered = new List<TriggeredRecommendation>();
 
         foreach (var rule in _rules)
         {
-            var match = rule.Evaluate(statistics, finding);
+            var match = rule.Evaluate(evidence);
             if (match is not null)
                 triggered.Add(match);
         }

@@ -16,6 +16,7 @@ public static class DefaultRecommendationRules
         new PacketLossInvestigateRule(),
         new HighJitterBufferbloatFollowUpRule(),
         new HighMedianLatencyRule(),
+        new SlowDnsResolutionRule(),
         new HealthyNoActionRule(),
     };
 }

@@ -1,5 +1,4 @@
 using NetPulse.Domain.Diagnostics;
-using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 
 namespace NetPulse.Domain.Recommendations.Rules;
@@ -29,8 +28,10 @@ public sealed class HighMedianLatencyRule : IRecommendationRule
         ReferenceDocumentation: new[] { "Project brief §2: distinguish what is under the PC's control from what depends on the router/ISP/remote infrastructure." },
         KnownLimitations: new[] { "There is no universal 'good' latency number; the right baseline depends on physical distance to the target." });
 
-    public TriggeredRecommendation? Evaluate(LatencyStatistics statistics, DiagnosticFinding finding)
+    public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
+        var (statistics, finding) = (evidence.Statistics, evidence.Finding);
+
         if (finding.Confidence == DiagnosticConfidence.Hypothesis)
             return null;
 

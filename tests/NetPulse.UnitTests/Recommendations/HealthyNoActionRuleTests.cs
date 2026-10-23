@@ -11,7 +11,7 @@ public class HealthyNoActionRuleTests
     [Fact]
     public void Evaluate_HealthyConfidence_Fires()
     {
-        var match = _rule.Evaluate(Stats(), Finding(DiagnosticConfidence.Healthy));
+        var match = _rule.Evaluate(Evidence(Stats(), Finding(DiagnosticConfidence.Healthy)));
 
         Assert.NotNull(match);
         Assert.Equal("recommend.healthy-no-action", match!.Descriptor.Id);
@@ -24,7 +24,7 @@ public class HealthyNoActionRuleTests
     [InlineData(DiagnosticConfidence.ExternalLimitation)]
     public void Evaluate_AnyNonHealthyConfidence_DoesNotFire(DiagnosticConfidence confidence)
     {
-        var match = _rule.Evaluate(Stats(), Finding(confidence));
+        var match = _rule.Evaluate(Evidence(Stats(), Finding(confidence)));
 
         Assert.Null(match);
     }
@@ -32,7 +32,7 @@ public class HealthyNoActionRuleTests
     [Fact]
     public void Evaluate_ExplicitlyProposesNoChange()
     {
-        var match = _rule.Evaluate(Stats(), Finding(DiagnosticConfidence.Healthy));
+        var match = _rule.Evaluate(Evidence(Stats(), Finding(DiagnosticConfidence.Healthy)));
 
         Assert.Equal("No change recommended", match!.Descriptor.Title);
         Assert.Empty(match.Descriptor.RequiredPermissions);

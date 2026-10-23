@@ -18,6 +18,30 @@ public class ConnectionDiagnosticUseCaseTests
         }
     }
 
+    private sealed class FakeTcpProbeService : ITcpConnectProbeService
+    {
+        private int _callCount;
+        public int CallCount => _callCount;
+
+        public Task<TcpConnectSample> ProbeOnceAsync(string target, int port, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            return Task.FromResult(new TcpConnectSample(target, port, DateTimeOffset.UtcNow, Connected: true, TimeSpan.FromMilliseconds(10), Error: null));
+        }
+    }
+
+    private sealed class FakeDnsProbeService : IDnsResolutionProbeService
+    {
+        private int _callCount;
+        public int CallCount => _callCount;
+
+        public Task<DnsResolutionSample> ProbeOnceAsync(string hostname, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _callCount);
+            return Task.FromResult(new DnsResolutionSample(hostname, DateTimeOffset.UtcNow, Resolved: true, TimeSpan.FromMilliseconds(5), new[] { "1.2.3.4" }, Error: null));
+        }
+    }
+
     private sealed class FakeHistoryRepository : IDiagnosticHistoryRepository
     {
         public readonly List<LatencyStatistics> Saved = new();
@@ -37,7 +61,7 @@ public class ConnectionDiagnosticUseCaseTests
     {
         var probeService = new FakeProbeService();
         var historyRepository = new FakeHistoryRepository();
-        var useCase = new ConnectionDiagnosticUseCase(probeService, historyRepository);
+        var useCase = new ConnectionDiagnosticUseCase(probeService, new FakeTcpProbeService(), new FakeDnsProbeService(), historyRepository);
 
         var options = new DiagnosticOptions(
             Targets: new[] { "1.1.1.1", "8.8.8.8" },
@@ -53,9 +77,39 @@ public class ConnectionDiagnosticUseCaseTests
     }
 
     [Fact]
+    public async Task RunAsync_IPLiteralTargets_ProbeTcpOnceButSkipDnsResolution()
+    {
+        var tcpProbeService = new FakeTcpProbeService();
+        var dnsProbeService = new FakeDnsProbeService();
+        var useCase = new ConnectionDiagnosticUseCase(new FakeProbeService(), tcpProbeService, dnsProbeService, new FakeHistoryRepository());
+
+        var options = new DiagnosticOptions(Targets: new[] { "1.1.1.1", "8.8.8.8" }, SampleCount: 1, IntervalBetweenSamples: TimeSpan.Zero);
+
+        var results = await useCase.RunAsync(options, CancellationToken.None);
+
+        Assert.Equal(2, tcpProbeService.CallCount); // one TCP confirmation attempt per target
+        Assert.Equal(0, dnsProbeService.CallCount); // IP literals have nothing to resolve
+        Assert.All(results, r => Assert.False(r.DnsCheck.IsApplicable));
+    }
+
+    [Fact]
+    public async Task RunAsync_HostnameTarget_ProbesDnsResolutionOnce()
+    {
+        var dnsProbeService = new FakeDnsProbeService();
+        var useCase = new ConnectionDiagnosticUseCase(new FakeProbeService(), new FakeTcpProbeService(), dnsProbeService, new FakeHistoryRepository());
+
+        var options = new DiagnosticOptions(Targets: new[] { "example.com" }, SampleCount: 1, IntervalBetweenSamples: TimeSpan.Zero);
+
+        var results = await useCase.RunAsync(options, CancellationToken.None);
+
+        Assert.Equal(1, dnsProbeService.CallCount);
+        Assert.True(results[0].DnsCheck.IsApplicable);
+    }
+
+    [Fact]
     public async Task RunAsync_NoTargets_Throws()
     {
-        var useCase = new ConnectionDiagnosticUseCase(new FakeProbeService(), new FakeHistoryRepository());
+        var useCase = new ConnectionDiagnosticUseCase(new FakeProbeService(), new FakeTcpProbeService(), new FakeDnsProbeService(), new FakeHistoryRepository());
         var options = new DiagnosticOptions(Targets: Array.Empty<string>());
 
         await Assert.ThrowsAsync<ArgumentException>(() => useCase.RunAsync(options, CancellationToken.None));
@@ -66,7 +120,7 @@ public class ConnectionDiagnosticUseCaseTests
     {
         var probeService = new FakeProbeService();
         var historyRepository = new FakeHistoryRepository();
-        var useCase = new ConnectionDiagnosticUseCase(probeService, historyRepository);
+        var useCase = new ConnectionDiagnosticUseCase(probeService, new FakeTcpProbeService(), new FakeDnsProbeService(), historyRepository);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
