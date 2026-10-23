@@ -8,9 +8,13 @@ namespace NetPulse.Application.UseCases;
 public sealed record DiagnosticOptions(
     IReadOnlyList<string> Targets,
     int SampleCount = 20,
-    TimeSpan IntervalBetweenSamples = default,
-    TimeSpan ProbeTimeout = default)
+    TimeSpan? IntervalBetweenSamples = null,
+    TimeSpan? ProbeTimeout = null)
 {
-    public TimeSpan EffectiveInterval => IntervalBetweenSamples == default ? TimeSpan.FromMilliseconds(200) : IntervalBetweenSamples;
-    public TimeSpan EffectiveTimeout => ProbeTimeout == default ? TimeSpan.FromSeconds(2) : ProbeTimeout;
+    // Nullable, not a TimeSpan defaulting to `default`: TimeSpan.Zero IS default(TimeSpan),
+    // so a caller explicitly requesting a zero interval/timeout would have been silently
+    // overridden back to the 200 ms / 2 s fallback - found by a performance test asserting
+    // actual elapsed time instead of just correctness.
+    public TimeSpan EffectiveInterval => IntervalBetweenSamples ?? TimeSpan.FromMilliseconds(200);
+    public TimeSpan EffectiveTimeout => ProbeTimeout ?? TimeSpan.FromSeconds(2);
 }

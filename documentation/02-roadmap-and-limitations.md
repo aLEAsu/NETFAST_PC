@@ -9,7 +9,7 @@
 | 3. Diagnostics-only prototype | **Implemented** — adapter inventory, ICMP latency diagnostic, dashboard, local history |
 | 4. Recommendation engine | **Implemented** — deterministic rules, risk levels, full descriptor metadata, dashboard panel. No change is simulated or applied yet; see below. |
 | 5. Controlled modifications (privileged agent) | **Implemented, write path unverified** — first real `IOptimizationAction` (`SetAdapterDnsServersAction`), fixed capability allow-list, per-operation elevation via a separate helper process, audit logging. The actual elevated write has never been executed - see `01-architecture.md` §10. |
-| 6. Security & performance validation | Not started — no FPS/CPU/RAM benchmarking harness exists yet |
+| 6. Security & performance validation | **Done for what's measurable here** — security audit, real idle CPU/RAM measurement, diagnostic-pipeline CPU benchmarks, traffic-bound validation, one real regression found and fixed. FPS/game-impact protocol not run (no game/PresentMon available). See `03-phase6-security-performance.md`. |
 | 7. Distribution (installer, signing) | Not started |
 
 ## Phase 4 scope note: "simulation of changes"
@@ -115,14 +115,13 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
   resource-usage claims in the original brief are **not yet verified** for this codebase and
   must not be repeated as fact until measured with PresentMon/dotnet-counters per §11.
 - **No installer, no signing.** Phase 7 work is entirely unstarted.
-- **Test coverage.** `NetPulse.UnitTests` has 14 fake-based tests covering `LatencyStatistics`
-  and `ConnectionDiagnosticUseCase`. `NetPulse.IntegrationTests` now has 21 tests that exercise
-  the **real** `NetworkAdapterInventoryService`, `IcmpLatencyProbeService`,
-  `SqliteDiagnosticHistoryRepository`, and the full pipeline wired together — no fakes, real
-  adapters, real ICMP traffic (loopback + the RFC 5737 `203.0.113.0/24` reserved block for a
-  guaranteed non-response), and a real temp SQLite file, with cleanup in `Dispose()`.
-  `SafetyTests` and `PerformanceTests` are still scaffolded but empty — there is nothing yet in
-  `PrivilegedAgent` or performance-sensitive code that justifies populating them.
+- **Test coverage (current).** `NetPulse.UnitTests`: 88 fake/pure-input tests (Domain +
+  Application + PrivilegedAgent logic). `NetPulse.IntegrationTests`: 28 tests against the
+  **real** adapter stack, ICMP, SQLite, and a real read-only WMI query — no fakes.
+  `NetPulse.SafetyTests`: 5 tests covering the full recovery lifecycle against fakes.
+  `NetPulse.PerformanceTests`: 4 real, executed CPU/allocation benchmarks. See
+  `01-architecture.md` §9–§11 and `03-phase6-security-performance.md` for what each suite
+  actually covers and what it deliberately does not (the elevated write path, FPS impact).
 - **Real bug found and fixed by the integration tests.** The loopback adapter reports MTU as
   `-1` through `IPInterfaceProperties.GetIPv4Properties().Mtu` instead of throwing or returning
   a sane value. `NetworkAdapterInventoryService.SafeMtu` now clamps any non-positive result to
