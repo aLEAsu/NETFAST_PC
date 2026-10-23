@@ -93,13 +93,22 @@ internal static class Program
                     continue;
 
                 using var inParams = candidate.GetMethodParameters("SetDNSServerSearchOrder");
-                inParams["DNSServerSearchOrder"] = dnsServers;
+                // Win32_NetworkAdapterConfiguration.SetDNSServerSearchOrder clears any static
+                // DNS override (reverting to DHCP-assigned servers) when this parameter is
+                // null - an empty array is not documented to behave the same way, so the
+                // "restore automatic DNS" case (dnsServers.Length == 0, see
+                // DnsServerAddressValidator) must pass null, not Array.Empty<string>().
+                inParams["DNSServerSearchOrder"] = dnsServers.Length == 0 ? null : dnsServers;
 
                 using var outParams = candidate.InvokeMethod("SetDNSServerSearchOrder", inParams, null);
                 var returnValue = Convert.ToUInt32(outParams?["ReturnValue"] ?? 1u);
 
+                var successMessage = dnsServers.Length == 0
+                    ? "Static DNS override cleared; adapter will use DHCP-assigned DNS servers."
+                    : $"DNS servers set to {string.Join(",", dnsServers)}.";
+
                 return returnValue == 0
-                    ? new HostResult(true, $"DNS servers set to {string.Join(",", dnsServers)}.", null)
+                    ? new HostResult(true, successMessage, null)
                     : new HostResult(false, null, $"SetDNSServerSearchOrder returned error code {returnValue}.");
             }
         }

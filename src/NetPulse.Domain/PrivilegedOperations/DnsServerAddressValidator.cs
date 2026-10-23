@@ -6,6 +6,12 @@ namespace NetPulse.Domain.PrivilegedOperations;
 /// Validates a proposed DNS server list before it is allowed anywhere near the elevated
 /// helper. Every address must be a literal IP - never a hostname, never anything that could
 /// be interpreted as a command-line flag or separator - and the list must be a sane size.
+///
+/// An EMPTY list is valid and means "clear any static DNS override and use the adapter's
+/// automatic (DHCP-assigned) DNS servers" - this is what SetDNSServerSearchOrder does when
+/// given an empty array, and it is the only way to roll back an adapter that had no static
+/// DNS configured before a change (the common case). Rejecting empty here would make
+/// SetAdapterDnsServersAction.RollbackAsync unable to restore that original state.
 /// </summary>
 public static class DnsServerAddressValidator
 {
@@ -15,9 +21,9 @@ public static class DnsServerAddressValidator
     {
         error = string.Empty;
 
-        if (addresses is null || addresses.Count == 0)
+        if (addresses is null)
         {
-            error = "At least one DNS server address is required.";
+            error = "DNS server list cannot be null.";
             return false;
         }
 

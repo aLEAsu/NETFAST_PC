@@ -36,7 +36,7 @@ src/NetPulse.Persistence            local SQLite history + privileged-operation 
 src/NetPulse.PrivilegedAgent        SetAdapterDnsServersAction - orchestrates elevation, never performs it
 src/NetPulse.PrivilegedAgent.Host   separate elevated process; the ONLY code that writes DNS config (see its docs)
 src/NetPulse.App                    WPF dashboard (MVVM)
-tests/NetPulse.UnitTests            real tests for Domain/Application/PrivilegedAgent logic (81 tests, all fakes)
+tests/NetPulse.UnitTests            real tests for Domain/Application/PrivilegedAgent logic (83 tests, all fakes)
 tests/NetPulse.IntegrationTests     real tests against the actual adapter/ICMP/SQLite/WMI-read (28 tests)
 tests/NetPulse.SafetyTests          scaffolded, empty - where the elevated write path should be verified manually
 tests/NetPulse.PerformanceTests     scaffolded, empty

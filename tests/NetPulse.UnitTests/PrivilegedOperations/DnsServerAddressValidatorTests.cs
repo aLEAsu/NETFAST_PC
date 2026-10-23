@@ -22,12 +22,14 @@ public class DnsServerAddressValidatorTests
     }
 
     [Fact]
-    public void TryValidate_EmptyList_Fails()
+    public void TryValidate_EmptyList_SucceedsAsAnAutomaticDnsRequest()
     {
+        // Empty means "clear any static override and use DHCP-assigned DNS" - this is
+        // exactly what rolling back an adapter that had no static DNS before needs to send.
         var isValid = DnsServerAddressValidator.TryValidate(Array.Empty<string>(), out var error);
 
-        Assert.False(isValid);
-        Assert.NotEmpty(error);
+        Assert.True(isValid);
+        Assert.Empty(error);
     }
 
     [Fact]

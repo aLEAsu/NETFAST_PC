@@ -1,3 +1,4 @@
+using System.Net;
 using NetPulse.Application.Ports;
 using NetPulse.Domain.Optimization;
 using NetPulse.Domain.PrivilegedOperations;
@@ -107,7 +108,7 @@ public sealed class SetAdapterDnsServersAction : IOptimizationAction
     public async Task<OptimizationResult> VerifyAsync(CancellationToken cancellationToken)
     {
         var currentServers = await _dnsReader.GetDnsServersAsync(_adapterId, cancellationToken);
-        bool matches = currentServers.SequenceEqual(_requestedDnsServers);
+        bool matches = DnsServerListsMatch(currentServers, _requestedDnsServers);
 
         await _auditLog.RecordAsync(
             new PrivilegedOperationAuditEntry(DateTimeOffset.UtcNow, nameof(PrivilegedCapability.SetAdapterDnsServers), _adapterId, "Verify", matches, $"Observed: {string.Join(",", currentServers)}"),
@@ -143,5 +144,31 @@ public sealed class SetAdapterDnsServersAction : IOptimizationAction
             DateTimeOffset.UtcNow,
             result.Output,
             result.Succeeded ? null : result.Error);
+    }
+
+    /// <summary>
+    /// Compares by parsed address value, not raw string, and in order. WMI can return an
+    /// IPv6 literal in a different canonical form than the one the caller supplied (e.g.
+    /// "::1" vs "0:0:0:0:0:0:0:1"); a textual SequenceEqual would wrongly report
+    /// VerifiedInconclusive for a change that actually succeeded.
+    /// </summary>
+    private static bool DnsServerListsMatch(IReadOnlyList<string> observed, IReadOnlyList<string> requested)
+    {
+        if (observed.Count != requested.Count)
+            return false;
+
+        for (int i = 0; i < observed.Count; i++)
+        {
+            if (!IPAddress.TryParse(observed[i], out var observedAddress))
+                return false;
+
+            if (!IPAddress.TryParse(requested[i], out var requestedAddress))
+                return false;
+
+            if (!observedAddress.Equals(requestedAddress))
+                return false;
+        }
+
+        return true;
     }
 }

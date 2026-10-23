@@ -155,6 +155,20 @@ public class SetAdapterDnsServersActionTests
     }
 
     [Fact]
+    public async Task VerifyAsync_SameAddressInADifferentIPv6CanonicalForm_StillMatches()
+    {
+        // WMI can hand back "::1" for a server the caller requested as "0:0:0:0:0:0:0:1" (or
+        // vice versa) - both are the same address. A textual comparison would wrongly call
+        // this VerifiedInconclusive even though the change took effect exactly as asked.
+        var reader = new FakeDnsReader { ServersToReturn = new[] { "0:0:0:0:0:0:0:1" } };
+        var action = new SetAdapterDnsServersAction(ValidAdapterId, new[] { "::1" }, new FakeAdapterInventory(), reader, new FakeElevatedLauncher(), new FakeAuditLog());
+
+        var result = await action.VerifyAsync(CancellationToken.None);
+
+        Assert.Equal(OptimizationOutcome.VerifiedImproved, result.Outcome);
+    }
+
+    [Fact]
     public async Task VerifyAsync_ObservedServersDoNotMatch_ReturnsVerifiedInconclusive()
     {
         var reader = new FakeDnsReader { ServersToReturn = new[] { "203.0.113.53" } }; // unchanged - apply did not take effect
@@ -163,6 +177,23 @@ public class SetAdapterDnsServersActionTests
         var result = await action.VerifyAsync(CancellationToken.None);
 
         Assert.Equal(OptimizationOutcome.VerifiedInconclusive, result.Outcome);
+    }
+
+    [Fact]
+    public async Task RollbackAsync_AdapterHadNoStaticDnsBeforeTheChange_RestoresAutomaticDns()
+    {
+        // Regression test: CaptureAsync on an adapter using DHCP-assigned DNS returns an
+        // empty list, which joins to "". Rollback must be able to send that empty list back
+        // through the launcher (meaning "clear the static override") rather than having it
+        // rejected as "no DNS servers given" - that would make rollback impossible for the
+        // single most common starting configuration.
+        var launcher = new FakeElevatedLauncher { ShouldSucceed = true };
+        var action = new SetAdapterDnsServersAction(ValidAdapterId, new[] { "1.1.1.1" }, new FakeAdapterInventory(), new FakeDnsReader(), launcher, new FakeAuditLog());
+
+        var result = await action.RollbackAsync(string.Empty, CancellationToken.None);
+
+        Assert.Equal(OptimizationOutcome.RolledBack, result.Outcome);
+        Assert.Empty(launcher.LastRequest!.Parameters);
     }
 
     [Fact]

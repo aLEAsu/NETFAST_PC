@@ -27,6 +27,48 @@ current rule reads "Not applicable" because nothing is ever applied. A rule that
 actual Windows setting change is deliberately deferred to Phase 5, once there is a reviewed
 `IOptimizationAction` implementation behind it.
 
+## Phase 5 verification pass (post-implementation review)
+
+Before starting Phase 6, Phase 5's logic, structure, and integration were reviewed end to
+end (not just "it compiles and the happy-path tests pass"). This found and fixed four real
+issues, all now covered by regression tests:
+
+1. **Rollback-to-automatic-DNS was impossible.** `DnsServerAddressValidator` rejected empty
+   lists. But `CaptureAsync` on an adapter using DHCP-assigned DNS (the common case - most
+   adapters have no static DNS configured) captures an empty list. `RollbackAsync` would
+   then try to send that empty list through the same validator and get rejected, meaning the
+   single most common starting configuration could never be rolled back to. Fixed: an empty
+   list is now valid and means "clear the static override, use DHCP-assigned DNS" -
+   documented in the validator's own doc comment, not just in this file.
+2. **Complementary WMI fix.** `SetDNSServerSearchOrder` is documented to clear the static
+   override when given `null`, not necessarily when given an empty array. `NetPulse.PrivilegedAgent.Host`
+   now passes `null` explicitly for the empty-list case rather than relying on an empty
+   array behaving the same way.
+3. **`VerifyAsync` could report a successful change as inconclusive.** It compared DNS server
+   lists as raw strings (`SequenceEqual`). WMI can hand back an IPv6 address in a different
+   but equal canonical form (e.g. `::1` vs `0:0:0:0:0:0:0:1`) than the one requested, which
+   would fail a textual comparison even though the change took effect exactly as asked -
+   directly undermining the brief's "never claim success/failure without a real check"
+   principle, just in the failure direction. Fixed: comparison now parses both sides to
+   `IPAddress` and compares by value, in order.
+4. **An unhandled exception could escape `ElevatedHelperOperationLauncher`.** If the elevated
+   helper's result file were missing, truncated, or malformed JSON (e.g. the process was
+   killed mid-write), `JsonSerializer.Deserialize` or the file read could throw a type the
+   existing `catch` block didn't cover, propagating an unhandled exception up through
+   `SetAdapterDnsServersAction.ApplyAsync`. Fixed: a broad catch now converts any such failure
+   into a clean `Failed` result, while still letting `OperationCanceledException` propagate
+   as cancellation (not an error).
+
+A fifth issue was a minor robustness fix rather than a correctness bug:
+`WmiAdapterDnsConfigurationReader.GetDnsServersAsync` ran its blocking WMI query synchronously
+behind a `Task`-typed signature; it now runs on the thread pool via `Task.Run` so a future UI
+caller's thread isn't blocked for the duration of the query.
+
+81 unit tests grew to 83 (two new regression tests); 28 integration tests are unaffected and
+still pass. None of this touches the still-unverified elevated write path itself (see the
+scope note below) - these are logic fixes in code that was already reachable by real tests,
+found by reading the code again deliberately rather than by running it.
+
 ## Phase 5 scope note: what "implemented" means here
 
 Every piece of Phase 5 compiles, is wired together correctly, and is covered by real tests

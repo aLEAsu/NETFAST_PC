@@ -17,6 +17,14 @@ public sealed class WmiAdapterDnsConfigurationReader : IAdapterDnsConfigurationR
         if (!AdapterIdValidator.TryValidate(adapterId, out var error))
             throw new ArgumentException(error, nameof(adapterId));
 
+        // The WMI call below is blocking (System.Management has no async API) - running it
+        // on the thread pool rather than returning a pre-completed Task keeps a future WPF
+        // caller's UI thread free while it runs.
+        return Task.Run(() => QueryDnsServers(adapterId, cancellationToken), cancellationToken);
+    }
+
+    private static IReadOnlyList<string> QueryDnsServers(string adapterId, CancellationToken cancellationToken)
+    {
         var normalizedId = AdapterIdValidator.Normalize(adapterId);
 
         using var searcher = new ManagementObjectSearcher(
@@ -35,11 +43,10 @@ public sealed class WmiAdapterDnsConfigurationReader : IAdapterDnsConfigurationR
                 if (!string.Equals(AdapterIdValidator.Normalize(settingId), normalizedId, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                var servers = (string[]?)result["DNSServerSearchOrder"] ?? Array.Empty<string>();
-                return Task.FromResult<IReadOnlyList<string>>(servers);
+                return (string[]?)result["DNSServerSearchOrder"] ?? Array.Empty<string>();
             }
         }
 
-        return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        return Array.Empty<string>();
     }
 }

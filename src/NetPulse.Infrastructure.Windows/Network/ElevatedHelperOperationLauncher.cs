@@ -80,6 +80,18 @@ public sealed class ElevatedHelperOperationLauncher : IElevatedOperationLauncher
             // Thrown when the user declines the UAC prompt (ERROR_CANCELLED).
             return Failed(request, $"Elevation was not granted: {ex.Message}");
         }
+        catch (OperationCanceledException)
+        {
+            throw; // Cancellation must propagate, not be reported as an operation failure.
+        }
+        catch (Exception ex)
+        {
+            // Covers a malformed/truncated result file (e.g. the elevated process was killed
+            // mid-write) or any other unexpected failure talking to it - this boundary must
+            // never let an exception escape uncaught, per the brief's requirement that every
+            // privileged-operation outcome be reported clearly rather than crash the caller.
+            return Failed(request, $"Elevated helper execution failed: {ex.Message}");
+        }
     }
 
     private static PrivilegedOperationResult Failed(PrivilegedOperationRequest request, string error) =>

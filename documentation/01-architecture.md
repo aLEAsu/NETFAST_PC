@@ -94,7 +94,7 @@ entries, so it cannot accidentally pull in WPF, SQLite, or Windows-only APIs.
 | `NetPulse.PrivilegedAgent` | `SetAdapterDnsServersAction` — the first real `IOptimizationAction`; never writes anything itself, only orchestrates the ports | Domain, Application |
 | `NetPulse.PrivilegedAgent.Host` | Separate elevated console executable; the ONLY code in the solution that calls `SetDNSServerSearchOrder` | Domain only |
 | `NetPulse.App` | WPF dashboard, `DashboardViewModel` (CommunityToolkit.Mvvm), DI wiring in `App.xaml.cs` | all of the above |
-| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics`, `ConnectionDiagnosticUseCase`, all 5 recommendation rules, `RecommendationEngine`, `GenerateRecommendationsUseCase`, both privileged-operation validators, and `SetAdapterDnsServersAction` — 81 tests, all fake/pure-input based | Domain, Application, PrivilegedAgent |
+| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics`, `ConnectionDiagnosticUseCase`, all 5 recommendation rules, `RecommendationEngine`, `GenerateRecommendationsUseCase`, both privileged-operation validators, and `SetAdapterDnsServersAction` — 83 tests, all fake/pure-input based | Domain, Application, PrivilegedAgent |
 | `tests/NetPulse.IntegrationTests` | Real tests against the actual adapter stack, real ICMP, a real SQLite file, and a real read-only WMI query — no fakes, 28 tests (see §9) | Domain, Application, Infrastructure.Windows, Persistence |
 | `tests/NetPulse.SafetyTests` | Scaffolded, still empty — this is where the elevated write path in §10 should eventually be verified, manually, by a person. | varies |
 | `tests/NetPulse.PerformanceTests` | Scaffolded, empty. | varies |
@@ -318,7 +318,7 @@ dotnet test tests/NetPulse.IntegrationTests/NetPulse.IntegrationTests.csproj
 dotnet run --project src/NetPulse.App/NetPulse.App.csproj
 ```
 
-Verified in this environment: solution builds with 0 errors/0 warnings, 81/81 unit tests pass,
+Verified in this environment: solution builds with 0 errors/0 warnings, 83/83 unit tests pass,
 28/28 integration tests pass against the real adapter stack/ICMP/SQLite/WMI (read-only), and
 the app launches and reaches the dashboard (`MainWindowTitle` confirmed via a running process
 check). Not verified: the elevated write path described in §10.
