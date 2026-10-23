@@ -53,7 +53,7 @@ src/NetPulse.PrivilegedAgent        SetAdapterDnsServersAction - orchestrates el
 src/NetPulse.PrivilegedAgent.Host   separate elevated process; the ONLY code that writes DNS config (see its docs)
 src/NetPulse.App                    WPF dashboard (MVVM) - adapter selection, profile picker, DNS action wired to real buttons
 tests/NetPulse.UnitTests            real tests for Domain/Application/PrivilegedAgent logic (~104 tests, all fakes)
-tests/NetPulse.IntegrationTests     real tests against the actual adapter/ICMP/TCP/DNS/SQLite/WMI-read (~35 tests)
+tests/NetPulse.IntegrationTests     real tests against the actual adapter/ICMP/TCP/DNS/SQLite/WMI-read, plus NetPulse.App's FindingRowViewModel (~40 tests)
 tests/NetPulse.SafetyTests          real recovery-lifecycle tests against fakes (5 tests) - elevated write path still needs manual verification
 tests/NetPulse.PerformanceTests     real CPU/allocation benchmarks for the diagnostic pipeline (4 tests)
 installer/                          WiX MSI installer (build.ps1, sign.ps1) - see its own README

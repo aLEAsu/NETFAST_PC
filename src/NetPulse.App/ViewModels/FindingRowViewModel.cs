@@ -8,6 +8,8 @@ public sealed class FindingRowViewModel
     {
         var stats = result.Statistics;
         var finding = result.Finding;
+        var tcp = result.TcpCheck;
+        var dns = result.DnsCheck;
 
         Target = stats.Target;
         Confidence = finding.Confidence.ToString();
@@ -17,6 +19,16 @@ public sealed class FindingRowViewModel
         Jitter = $"{stats.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms";
         Loss = $"{stats.PacketLossPercent:F1}%";
         Limitations = finding.Limitations.Length > 0 ? string.Join(" | ", finding.Limitations) : "-";
+
+        TcpCheck = tcp.Connected
+            ? $"Connected ({tcp.ConnectTime!.Value.TotalMilliseconds:F0} ms, port {tcp.Port})"
+            : $"Failed (port {tcp.Port}): {tcp.Error}";
+
+        DnsCheck = !dns.IsApplicable
+            ? "N/A (target is an IP literal)"
+            : dns.Resolved
+                ? $"Resolved ({dns.ResolutionTime!.Value.TotalMilliseconds:F0} ms)"
+                : $"Failed: {dns.Error}";
     }
 
     public string Target { get; }
@@ -26,5 +38,7 @@ public sealed class FindingRowViewModel
     public string P95 { get; }
     public string Jitter { get; }
     public string Loss { get; }
+    public string TcpCheck { get; }
+    public string DnsCheck { get; }
     public string Limitations { get; }
 }

@@ -17,10 +17,11 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
 
 ## 2. What is actually true right now (verified, not claimed)
 
-- Builds clean, 0 errors/0 warnings. 148 tests pass across four suites: ~104 unit (fakes),
-  ~35 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read), 5 safety (recovery lifecycle,
-  fakes), 4 performance (real CPU/allocation benchmarks). Re-run all four before trusting
-  this number - it will have moved by the time you read this.
+- Builds clean, 0 errors/0 warnings. 153 tests pass across four suites: ~104 unit (fakes),
+  ~40 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read, plus `NetPulse.App`'s
+  `FindingRowViewModel`), 5 safety (recovery lifecycle, fakes), 4 performance (real
+  CPU/allocation benchmarks). Re-run all four before trusting this number - it will have
+  moved by the time you read this.
 - Diagnostics (ICMP + TCP confirmation + DNS resolution timing) are real and tested.
 - The recommendation engine (6 rules) is real and tested. Exactly one rule
   (`SlowDnsResolutionRule`) has an applyable action behind it.
@@ -104,9 +105,16 @@ revealed needs automated coverage going forward (per
 
 ## 5. Priority 2: small, cheap completions
 
-- **Surface TCP/DNS probe results in the UI.** `DiagnosticRunResult.TcpCheck`/`DnsCheck` are
-  computed on every run but `FindingRowViewModel` doesn't show them. Add columns/properties;
-  this is a presentation-only change, no new backend work, should take under an hour.
+- ~~**Surface TCP/DNS probe results in the UI.**~~ **Done.** `FindingRowViewModel` now has
+  `TcpCheck`/`DnsCheck` string properties (e.g. "Connected (12 ms, port 443)" / "N/A (target
+  is an IP literal)" / "Failed: <error>"), shown automatically by the findings `DataGrid`'s
+  `AutoGenerateColumns`. Verified with 5 real tests in
+  `tests/NetPulse.IntegrationTests/App/FindingRowViewModelTests.cs` - not
+  `NetPulse.UnitTests`, because `NetPulse.App` targets `net10.0-windows` and
+  `NetPulse.UnitTests` targets plain `net10.0`, which can't reference a Windows-targeted
+  project. If `NetPulse.App` grows more testable logic, keep using
+  `NetPulse.IntegrationTests` for it (it already targets `net10.0-windows`) rather than
+  retargeting `NetPulse.UnitTests`.
 - **Consider exposing `DiagnosticOptions.TcpConfirmationPort`** in the UI if real-world use
   shows 443 is frequently wrong for a given target (e.g. targets that only answer on 80).
 

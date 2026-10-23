@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\NetPulse.Application\NetPulse.Application.csproj" />
     <ProjectReference Include="..\..\src\NetPulse.Infrastructure.Windows\NetPulse.Infrastructure.Windows.csproj" />
     <ProjectReference Include="..\..\src\NetPulse.Persistence\NetPulse.Persistence.csproj" />
+    <ProjectReference Include="..\..\src\NetPulse.App\NetPulse.App.csproj" />
   </ItemGroup>
 
 </Project>
