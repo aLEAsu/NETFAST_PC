@@ -33,12 +33,14 @@ public class DiagnosticPipelinePerformanceTests
     }
 
     [Fact]
-    public void LatencyStatistics_From_1000Samples_CompletesWellUnderOneMillisecond()
+    public void LatencyStatistics_From_1000Samples_CompletesWellUnderFiveMilliseconds()
     {
         var baseTime = DateTimeOffset.UtcNow;
         var samples = Enumerable.Range(0, 1000)
             .Select(i => new LatencySample("1.1.1.1", baseTime.AddMilliseconds(i), true, TimeSpan.FromMilliseconds(10 + i % 50)))
             .ToList();
+
+        LatencyStatistics.From("1.1.1.1", samples); // warm up (JIT) before the measured loop
 
         var stopwatch = Stopwatch.StartNew();
         for (int i = 0; i < 100; i++)
@@ -75,6 +77,12 @@ public class DiagnosticPipelinePerformanceTests
         // instant fake probe, so total elapsed time reflects only this project's code.
         var useCase = new ConnectionDiagnosticUseCase(new InstantFakeProbeService(), new NoOpHistoryRepository());
         var options = new DiagnosticOptions(new[] { "1.1.1.1", "8.8.8.8" }, SampleCount: 20, IntervalBetweenSamples: TimeSpan.Zero);
+
+        // This is a single-shot measurement (unlike the averaged-over-many-iterations tests
+        // above), so it is more sensitive to one-time JIT cost - a real factor the very bug
+        // this suite caught (DiagnosticOptions' zero-interval regression) was found through.
+        // Warming up once first keeps the measured run representative of steady-state cost.
+        await useCase.RunAsync(options, CancellationToken.None);
 
         var stopwatch = Stopwatch.StartNew();
         var results = await useCase.RunAsync(options, CancellationToken.None);
