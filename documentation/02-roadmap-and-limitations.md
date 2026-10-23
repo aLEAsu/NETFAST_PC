@@ -37,20 +37,29 @@
   resource-usage claims in the original brief are **not yet verified** for this codebase and
   must not be repeated as fact until measured with PresentMon/dotnet-counters per §11.
 - **No installer, no signing.** Phase 7 work is entirely unstarted.
-- **Test coverage.** Only `NetPulse.UnitTests` has real tests (14, covering `LatencyStatistics`
-  and `ConnectionDiagnosticUseCase`). `IntegrationTests`, `SafetyTests`, and `PerformanceTests`
-  are scaffolded but empty — there is nothing yet in `Infrastructure.Windows`, `PrivilegedAgent`,
-  or performance-sensitive code that justifies populating them.
+- **Test coverage.** `NetPulse.UnitTests` has 14 fake-based tests covering `LatencyStatistics`
+  and `ConnectionDiagnosticUseCase`. `NetPulse.IntegrationTests` now has 21 tests that exercise
+  the **real** `NetworkAdapterInventoryService`, `IcmpLatencyProbeService`,
+  `SqliteDiagnosticHistoryRepository`, and the full pipeline wired together — no fakes, real
+  adapters, real ICMP traffic (loopback + the RFC 5737 `203.0.113.0/24` reserved block for a
+  guaranteed non-response), and a real temp SQLite file, with cleanup in `Dispose()`.
+  `SafetyTests` and `PerformanceTests` are still scaffolded but empty — there is nothing yet in
+  `PrivilegedAgent` or performance-sensitive code that justifies populating them.
+- **Real bug found and fixed by the integration tests.** The loopback adapter reports MTU as
+  `-1` through `IPInterfaceProperties.GetIPv4Properties().Mtu` instead of throwing or returning
+  a sane value. `NetworkAdapterInventoryService.SafeMtu` now clamps any non-positive result to
+  `0` (the project's existing "unknown" marker), so the dashboard never shows a negative MTU.
+  This is exactly the kind of thing fakes would never have caught.
 
 ## Immediate next steps (suggested, not started)
 
 1. Add a TCP-connect and DNS-resolution probe alongside ICMP, so loss classification can
    distinguish "no ICMP reply" from "no application-level connectivity."
-2. Flesh out `NetPulse.IntegrationTests` against the real `NetworkAdapterInventoryService` and
-   `IcmpLatencyProbeService` (these need a live network, so keep them separate from the
-   fake-based unit tests).
-3. Design and review the first 1–2 `IOptimizationAction` implementations (e.g. a DNS-server
+2. Design and review the first 1–2 `IOptimizationAction` implementations (e.g. a DNS-server
    recommendation) with their full capture/apply/verify/rollback contract before writing any
    code that touches the registry or adapter settings.
-4. Run the brief's FPS/network validation protocol (§11–12) once there is an actual
+3. Run the brief's FPS/network validation protocol (§11–12) once there is an actual
    optimization to measure, rather than against the diagnostics-only build.
+4. Once `PrivilegedAgent` gains real capabilities, populate `SafetyTests` (rollback correctness,
+   capability allow-list enforcement) and `PerformanceTests` (resource usage under repeated
+   diagnostic runs).

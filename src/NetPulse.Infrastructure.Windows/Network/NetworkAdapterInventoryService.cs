@@ -69,7 +69,11 @@ public sealed class NetworkAdapterInventoryService : INetworkAdapterInventorySer
     {
         try
         {
-            return props.GetIPv4Properties().Mtu;
+            // Some interfaces (observed on the loopback pseudo-interface) report a negative
+            // MTU rather than throwing - that is not a real value, so normalize it to the
+            // same "unknown" marker (0) used when the query is unsupported outright.
+            var mtu = props.GetIPv4Properties().Mtu;
+            return mtu > 0 ? mtu : 0;
         }
         catch (NetworkInformationException)
         {

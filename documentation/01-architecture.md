@@ -89,7 +89,8 @@ entries, so it cannot accidentally pull in WPF, SQLite, or Windows-only APIs.
 | `NetPulse.PrivilegedAgent` | Placeholder only (see its `README.md`) — no code | Domain, Application |
 | `NetPulse.App` | WPF dashboard, `DashboardViewModel` (CommunityToolkit.Mvvm), DI wiring in `App.xaml.cs` | all of the above |
 | `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics` and `ConnectionDiagnosticUseCase` (incl. classification thresholds), using fakes for the ports | Domain, Application |
-| `tests/NetPulse.IntegrationTests`, `SafetyTests`, `PerformanceTests` | Scaffolded, empty. Populate starting Phase 5 once there are privileged operations and optimization rules to exercise. | varies |
+| `tests/NetPulse.IntegrationTests` | Real tests against the actual adapter stack, real ICMP, and a real SQLite file — no fakes (see §9a) | Domain, Application, Infrastructure.Windows, Persistence |
+| `tests/NetPulse.SafetyTests`, `PerformanceTests` | Scaffolded, empty. Populate starting Phase 5 once there are privileged operations and optimization rules to exercise. | varies |
 
 ## 5. Diagnostic flow (implemented)
 
@@ -161,6 +162,25 @@ credentials. Database file: `%LOCALAPPDATA%\NetPulseOptimizer\netpulse.db`.
 
 Each of these needs its own design pass before code; none should be bolted on as a quick
 addition to the current prototype.
+
+## 9a. Integration tests against the real adapter stack
+
+`tests/NetPulse.IntegrationTests` deliberately contains **no fakes**. It exercises:
+
+- `NetworkAdapterInventoryService` on the real machine (loopback is always present, so the
+  suite is deterministic even on a runner with no physical connectivity).
+- `IcmpLatencyProbeService` with real ICMP traffic: `127.0.0.1` for a guaranteed reply, and
+  `203.0.113.1` (RFC 5737 TEST-NET-3, reserved/non-routable) for a guaranteed non-reply —
+  chosen specifically so the suite never depends on a third-party host being reachable.
+- `SqliteDiagnosticHistoryRepository` against a real temporary `.db` file (round trip,
+  filtering, ordering, concurrent writes), cleaned up in each test class's `Dispose()`.
+- `ConnectionDiagnosticUseCase` wired end-to-end with the three services above — the same
+  wiring `App.xaml.cs` uses, minus WPF.
+
+These tests found a real defect: the loopback adapter reports MTU as `-1` instead of a sane
+value or an exception. `NetworkAdapterInventoryService.SafeMtu` now normalizes any
+non-positive MTU to `0`. This is the kind of bug fake-based unit tests cannot surface by
+construction — it is the reason this suite exists.
 
 ## 9. How to build and run
 
