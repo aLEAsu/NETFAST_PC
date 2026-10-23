@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:NetPulse.App"
         mc:Ignorable="d"
-        Title="NetPulse Optimizer - Diagnostic Prototype (Phase 3)" Height="680" Width="1100"
+        Title="NetPulse Optimizer - Diagnostics &amp; Recommendations (Phase 3-4)" Height="760" Width="1150"
         Background="#1E1F24">
     <Window.Resources>
         <Style TargetType="TextBlock">
@@ -31,12 +31,13 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="NetPulse Optimizer" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Diagnostics-only prototype. No network or system settings are modified by this build."
+            <TextBlock Text="Diagnostics + recommendations. Recommendations are informational only - no network or system setting is ever modified by this build."
                        FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0"/>
         </StackPanel>
 
@@ -58,10 +59,14 @@
             <DataGrid ItemsSource="{Binding Adapters}"/>
         </GroupBox>
 
-        <GroupBox Grid.Row="3" Header="Diagnostic findings (confidence-labeled; not a guarantee of cause)" Foreground="#E8E8EA">
+        <GroupBox Grid.Row="3" Header="Diagnostic findings (confidence-labeled; not a guarantee of cause)" Margin="0,0,0,12" Foreground="#E8E8EA">
             <DataGrid ItemsSource="{Binding Findings}"/>
         </GroupBox>
 
-        <TextBlock Grid.Row="4" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic" Foreground="#B5B5BD"/>
+        <GroupBox Grid.Row="4" Header="Recommendations (informational only - nothing is applied automatically)" Foreground="#E8E8EA">
+            <DataGrid ItemsSource="{Binding Recommendations}"/>
+        </GroupBox>
+
+        <TextBlock Grid.Row="5" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic" Foreground="#B5B5BD"/>
     </Grid>
 </Window>

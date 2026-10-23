@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NetPulse.App.ViewModels;
 using NetPulse.Application.Ports;
 using NetPulse.Application.UseCases;
+using NetPulse.Domain.Recommendations;
 using NetPulse.Infrastructure.Windows.Network;
 using NetPulse.Persistence;
 
@@ -28,6 +29,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ILatencyProbeService, IcmpLatencyProbeService>();
         services.AddSingleton<IDiagnosticHistoryRepository>(_ => new SqliteDiagnosticHistoryRepository(dbPath));
         services.AddSingleton<ConnectionDiagnosticUseCase>();
+        services.AddSingleton(_ => new RecommendationEngine(DefaultRecommendationRules.Create()));
+        services.AddSingleton<GenerateRecommendationsUseCase>();
         services.AddSingleton<DashboardViewModel>();
         services.AddSingleton<MainWindow>();
 

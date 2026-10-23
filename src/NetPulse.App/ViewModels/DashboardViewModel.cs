@@ -10,16 +10,22 @@ public sealed partial class DashboardViewModel : ObservableObject
 {
     private readonly INetworkAdapterInventoryService _adapterInventory;
     private readonly ConnectionDiagnosticUseCase _connectionDiagnostic;
+    private readonly GenerateRecommendationsUseCase _generateRecommendations;
     private CancellationTokenSource? _runCancellation;
 
-    public DashboardViewModel(INetworkAdapterInventoryService adapterInventory, ConnectionDiagnosticUseCase connectionDiagnostic)
+    public DashboardViewModel(
+        INetworkAdapterInventoryService adapterInventory,
+        ConnectionDiagnosticUseCase connectionDiagnostic,
+        GenerateRecommendationsUseCase generateRecommendations)
     {
         _adapterInventory = adapterInventory;
         _connectionDiagnostic = connectionDiagnostic;
+        _generateRecommendations = generateRecommendations;
     }
 
     public ObservableCollection<AdapterRowViewModel> Adapters { get; } = new();
     public ObservableCollection<FindingRowViewModel> Findings { get; } = new();
+    public ObservableCollection<RecommendationRowViewModel> Recommendations { get; } = new();
 
     [ObservableProperty]
     private string _targetsText = "1.1.1.1, 8.8.8.8";
@@ -66,6 +72,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         _runCancellation = new CancellationTokenSource();
         StatusText = $"Running {SampleCount} probes against {targets.Count} target(s)...";
         Findings.Clear();
+        Recommendations.Clear();
 
         try
         {
@@ -75,7 +82,10 @@ public sealed partial class DashboardViewModel : ObservableObject
             foreach (var result in results)
                 Findings.Add(new FindingRowViewModel(result));
 
-            StatusText = $"Diagnostic complete at {DateTimeOffset.Now:T}. {results.Count} target(s) evaluated.";
+            foreach (var recommendation in _generateRecommendations.Run(results))
+                Recommendations.Add(new RecommendationRowViewModel(recommendation));
+
+            StatusText = $"Diagnostic complete at {DateTimeOffset.Now:T}. {results.Count} target(s) evaluated, {Recommendations.Count} recommendation(s).";
         }
         catch (OperationCanceledException)
         {

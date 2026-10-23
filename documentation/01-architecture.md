@@ -1,7 +1,8 @@
 # NetPulse Optimizer — Technical Design
 
-Status: **Phase 3 (diagnostics-only prototype) implemented and building.** No optimization,
-no privileged operation, and no system/network modification exists in this codebase yet.
+Status: **Phases 3 and 4 (diagnostics + recommendation engine) implemented and building.**
+No optimization is actually applied, no privileged operation exists, and no system/network
+modification exists in this codebase yet - every recommendation is informational only.
 Everything below that is not reflected in `src/` is a proposal for later phases, labeled as such.
 
 ## 1. Executive summary
@@ -10,8 +11,9 @@ NetPulse Optimizer is a Windows desktop application that diagnoses, measures, an
 in later phases, under explicit user authorization — optimizes a PC's network path. The
 current build enumerates network adapters, runs bounded ICMP latency samples against
 user-chosen targets, computes median/P95/jitter/loss, classifies each result with an
-explicit confidence level, and stores the aggregated result locally in SQLite. It changes
-nothing on the machine.
+explicit confidence level, stores the aggregated result locally in SQLite, and runs a fixed
+set of deterministic rules over the result to produce risk-labeled, evidence-backed
+recommendations. It changes nothing on the machine - recommendations are informational only.
 
 ## 2. Requirements
 
@@ -82,13 +84,13 @@ entries, so it cannot accidentally pull in WPF, SQLite, or Windows-only APIs.
 
 | Project | Responsibility | Depends on |
 |---|---|---|
-| `NetPulse.Domain` | `NetworkAdapterInfo`, `LatencySample`, `LatencyStatistics` (pure stats math), `DiagnosticFinding`/`DiagnosticConfidence`, `IOptimizationAction` contract (unused by any implementation yet) | — |
-| `NetPulse.Application` | Ports (`INetworkAdapterInventoryService`, `ILatencyProbeService`, `IDiagnosticHistoryRepository`), `ConnectionDiagnosticUseCase` (orchestration + classification) | Domain |
+| `NetPulse.Domain` | `NetworkAdapterInfo`, `LatencySample`, `LatencyStatistics` (pure stats math), `DiagnosticFinding`/`DiagnosticConfidence`, `IOptimizationAction` contract (unused by any implementation yet), `IRecommendationRule`/`RecommendationEngine`/`DefaultRecommendationRules` + 5 rule implementations (§5a) | — |
+| `NetPulse.Application` | Ports (`INetworkAdapterInventoryService`, `ILatencyProbeService`, `IDiagnosticHistoryRepository`), `ConnectionDiagnosticUseCase` (orchestration + classification), `GenerateRecommendationsUseCase` (thin adapter to the Domain engine) | Domain |
 | `NetPulse.Infrastructure.Windows` | `NetworkAdapterInventoryService` (via `System.Net.NetworkInformation.NetworkInterface`, read-only), `IcmpLatencyProbeService` (via `Ping`) | Domain, Application |
 | `NetPulse.Persistence` | `SqliteDiagnosticHistoryRepository` — aggregated run history only, no raw packets | Domain, Application |
 | `NetPulse.PrivilegedAgent` | Placeholder only (see its `README.md`) — no code | Domain, Application |
 | `NetPulse.App` | WPF dashboard, `DashboardViewModel` (CommunityToolkit.Mvvm), DI wiring in `App.xaml.cs` | all of the above |
-| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics` and `ConnectionDiagnosticUseCase` (incl. classification thresholds), using fakes for the ports | Domain, Application |
+| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics`, `ConnectionDiagnosticUseCase` (incl. classification thresholds), all 5 recommendation rules, `RecommendationEngine`, and `GenerateRecommendationsUseCase` — 46 tests, all fake/pure-input based | Domain, Application |
 | `tests/NetPulse.IntegrationTests` | Real tests against the actual adapter stack, real ICMP, and a real SQLite file — no fakes (see §9a) | Domain, Application, Infrastructure.Windows, Persistence |
 | `tests/NetPulse.SafetyTests`, `PerformanceTests` | Scaffolded, empty. Populate starting Phase 5 once there are privileged operations and optimization rules to exercise. | varies |
 
@@ -118,9 +120,44 @@ entries, so it cannot accidentally pull in WPF, SQLite, or Windows-only APIs.
 | Jitter (mean abs. delta between consecutive RTTs) > 30 ms | Probable | States that cause attribution needs a load test, not this alone. |
 | None of the above | Healthy | States it only covers this target/window, not "the internet." |
 
-These are starting thresholds for the prototype, not a claimed universal standard — Phase 4's
-recommendation engine is expected to replace fixed cutoffs with historical-baseline and
-variability-aware analysis per §3.4 of the brief.
+These are starting thresholds for the prototype, not a claimed universal standard. Phase 4's
+recommendation engine (§5a) currently mirrors the same kind of fixed cutoffs rather than
+historical-baseline analysis — replacing them with variability-aware, learned baselines per
+§3.4 of the brief is still future work, tracked in `02-roadmap-and-limitations.md`.
+
+## 5a. Recommendation engine (implemented, Phase 4)
+
+`NetPulse.Domain.Recommendations` defines the rule contract and engine; `NetPulse.Application`
+only adapts between the diagnostic use case's output and the engine's input.
+
+1. After `ConnectionDiagnosticUseCase.RunAsync` returns one `DiagnosticRunResult` per target,
+   `DashboardViewModel.RunDiagnosticAsync` calls `GenerateRecommendationsUseCase.Run(results)`.
+2. That use case unwraps each result into `(LatencyStatistics, DiagnosticFinding)` and calls
+   `RecommendationEngine.Evaluate(...)` once per target.
+3. The engine runs every rule in `DefaultRecommendationRules.Create()` against that one target's
+   evidence and collects whichever rules return a non-null `TriggeredRecommendation`. Rules are
+   plain compiled classes - there is no plugin loader and no way to add a rule without a code
+   review and a rebuild.
+4. Each `TriggeredRecommendation` carries the firing rule's full `OptimizationDescriptor`
+   (objective, evidence, preconditions, risk, required permissions, verification/success/failure
+   criteria, rollback method, reference docs, known limitations) plus the specific
+   `TriggerExplanation` text for that run. The dashboard's "Recommendations" grid shows all of it.
+
+### The five rules shipped in this build
+
+| Rule | Fires when | Ever proposes a change? |
+|---|---|---|
+| `InsufficientSamplesRule` | `DiagnosticConfidence.Hypothesis` (too few samples) | No — only "collect more samples" |
+| `PacketLossInvestigateRule` | Loss ≥ 2% and confidence ≠ Hypothesis | No — only "investigate router/cable/ISP first" |
+| `HighJitterBufferbloatFollowUpRule` | Jitter > 30 ms and confidence ≠ Hypothesis | No — only "run a bufferbloat load test" (not implemented yet) |
+| `HighMedianLatencyRule` | Median RTT > 100 ms and confidence ≠ Hypothesis | No — only "compare wired vs. Wi-Fi / closer target" |
+| `HealthyNoActionRule` | `DiagnosticConfidence.Healthy` | No — explicitly "no change recommended" |
+
+No rule in this build can fire and propose an actual registry, TCP/IP, DNS, or adapter change,
+because no such `IOptimizationAction` implementation exists yet (Phase 5). Every rule's
+`RollbackMethod` reads "Not applicable" for exactly that reason. See
+`02-roadmap-and-limitations.md` for what the brief's Phase 4 "simulación de cambios" means in
+this build versus what is still deferred to Phase 5.
 
 ## 6. Data model (implemented)
 
@@ -187,9 +224,10 @@ construction — it is the reason this suite exists.
 ```bash
 dotnet build NetPulseOptimizer.slnx
 dotnet test tests/NetPulse.UnitTests/NetPulse.UnitTests.csproj
+dotnet test tests/NetPulse.IntegrationTests/NetPulse.IntegrationTests.csproj
 dotnet run --project src/NetPulse.App/NetPulse.App.csproj
 ```
 
-Verified in this environment: solution builds with 0 errors/0 warnings, 14/14 unit tests pass,
-and the app launches and reaches the dashboard (`MainWindowTitle` confirmed via a running
-process check).
+Verified in this environment: solution builds with 0 errors/0 warnings, 46/46 unit tests pass,
+21/21 integration tests pass against the real adapter stack/ICMP/SQLite, and the app launches
+and reaches the dashboard (`MainWindowTitle` confirmed via a running process check).
