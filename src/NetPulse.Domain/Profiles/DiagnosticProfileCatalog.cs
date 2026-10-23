@@ -21,7 +21,7 @@ public static class DiagnosticProfileCatalog
         DiagnosticProfile.General => new(
             DiagnosticProfile.General,
             "General",
-            "Balanced defaults for everyday use - no particular finding is prioritized over another.",
+            "Equilibrio para uso cotidiano - ningún hallazgo en particular se prioriza sobre otro.",
             SampleCount: 20,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(200),
             ProbeTimeout: TimeSpan.FromSeconds(2),
@@ -29,8 +29,8 @@ public static class DiagnosticProfileCatalog
 
         DiagnosticProfile.Gaming => new(
             DiagnosticProfile.Gaming,
-            "Gaming / low latency",
-            "More samples to better detect jitter, since consistency matters more than raw throughput for real-time play. Jitter and latency findings are shown first.",
+            "Juegos / baja latencia",
+            "Más muestras para detectar mejor el jitter, ya que la consistencia importa más que el throughput en tiempo real. Los hallazgos de jitter y latencia se muestran primero.",
             SampleCount: 30,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(100),
             ProbeTimeout: TimeSpan.FromSeconds(1),
@@ -38,8 +38,8 @@ public static class DiagnosticProfileCatalog
 
         DiagnosticProfile.Downloads => new(
             DiagnosticProfile.Downloads,
-            "Downloads / transfer performance",
-            "Standard sampling - packet loss findings are shown first, since loss affects transfer throughput and retries more than jitter does.",
+            "Descargas / rendimiento de transferencia",
+            "Muestreo estándar - los hallazgos de pérdida de paquetes se muestran primero, ya que la pérdida afecta más al throughput y a los reintentos que el jitter.",
             SampleCount: 20,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(200),
             ProbeTimeout: TimeSpan.FromSeconds(2),
@@ -47,8 +47,8 @@ public static class DiagnosticProfileCatalog
 
         DiagnosticProfile.VideoCalls => new(
             DiagnosticProfile.VideoCalls,
-            "Video calls / stability",
-            "More samples, shorter spacing, to better catch the short jitter/loss spikes that cause call glitches. Both are shown first.",
+            "Videollamadas / estabilidad",
+            "Más muestras, con menor espaciado, para detectar mejor los picos breves de jitter/pérdida que causan cortes en las llamadas. Ambos se muestran primero.",
             SampleCount: 30,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(150),
             ProbeTimeout: TimeSpan.FromSeconds(1),
@@ -56,8 +56,8 @@ public static class DiagnosticProfileCatalog
 
         DiagnosticProfile.Conservative => new(
             DiagnosticProfile.Conservative,
-            "Conservative",
-            "Fewer samples and a longer spacing, to minimize the traffic this diagnostic itself generates. Results are less statistically confident as a direct trade-off.",
+            "Conservador",
+            "Menos muestras y mayor espaciado, para minimizar el tráfico que el propio diagnóstico genera. Los resultados son menos confiables estadísticamente como contrapartida directa.",
             SampleCount: 10,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(300),
             ProbeTimeout: TimeSpan.FromSeconds(2),
@@ -65,8 +65,8 @@ public static class DiagnosticProfileCatalog
 
         DiagnosticProfile.Maintenance => new(
             DiagnosticProfile.Maintenance,
-            "Maintenance / thorough diagnosis",
-            "More samples than General, for a more statistically confident one-off check - meant for deliberately investigating a problem, not for routine/frequent use.",
+            "Mantenimiento / diagnóstico a fondo",
+            "Más muestras que General, para una comprobación puntual con mayor confianza estadística - pensado para investigar un problema deliberadamente, no para uso frecuente/rutinario.",
             SampleCount: 50,
             IntervalBetweenSamples: TimeSpan.FromMilliseconds(100),
             ProbeTimeout: TimeSpan.FromSeconds(2),

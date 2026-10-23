@@ -63,7 +63,7 @@ public sealed partial class DashboardViewModel : ObservableObject
     private int _sampleCount = 20;
 
     [ObservableProperty]
-    private string _statusText = "Ready. No diagnostic has been run yet.";
+    private string _statusText = "Listo. Todavía no se ha ejecutado ningún diagnóstico.";
 
     [ObservableProperty]
     private bool _isRunning;
@@ -90,7 +90,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         // unhandled exception here would crash the whole app via WPF's unhandled-exception
         // path rather than show an error, so every failure must be caught, not just the
         // ones in RunDiagnosticAsync.
-        StatusText = "Reading adapter inventory...";
+        StatusText = "Leyendo inventario de adaptadores...";
         Adapters.Clear();
 
         try
@@ -99,11 +99,11 @@ public sealed partial class DashboardViewModel : ObservableObject
             foreach (var adapter in adapters)
                 Adapters.Add(new AdapterRowViewModel(adapter));
 
-            StatusText = $"Loaded {Adapters.Count} adapter(s). This is read-only inventory - nothing was changed.";
+            StatusText = $"Se cargaron {Adapters.Count} adaptador(es). Esto es solo lectura - no se cambió nada.";
         }
         catch (Exception ex)
         {
-            StatusText = $"Could not read adapter inventory: {ex.Message}";
+            StatusText = $"No se pudo leer el inventario de adaptadores: {ex.Message}";
         }
     }
 
@@ -118,14 +118,14 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         if (targets.Count == 0)
         {
-            StatusText = "Enter at least one target (IP address or hostname) before running a diagnostic.";
+            StatusText = "Ingresa al menos un objetivo (dirección IP u hostname) antes de ejecutar un diagnóstico.";
             return;
         }
 
         IsRunning = true;
         RunDiagnosticCommand.NotifyCanExecuteChanged();
         _runCancellation = new CancellationTokenSource();
-        StatusText = $"Running {SampleCount} probes against {targets.Count} target(s)...";
+        StatusText = $"Ejecutando {SampleCount} sondeos contra {targets.Count} objetivo(s)...";
         Findings.Clear();
         Recommendations.Clear();
         CanRollbackDns = false;
@@ -151,15 +151,15 @@ public sealed partial class DashboardViewModel : ObservableObject
 
             ApplyDnsRecommendationCommand.NotifyCanExecuteChanged();
 
-            StatusText = $"Diagnostic complete at {DateTimeOffset.Now:T}. {results.Count} target(s) evaluated, {Recommendations.Count} recommendation(s).";
+            StatusText = $"Diagnóstico completo a las {DateTimeOffset.Now:T}. {results.Count} objetivo(s) evaluados, {Recommendations.Count} recomendación(es).";
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Diagnostic cancelled.";
+            StatusText = "Diagnóstico cancelado.";
         }
         catch (Exception ex)
         {
-            StatusText = $"Diagnostic failed: {ex.Message}";
+            StatusText = $"El diagnóstico falló: {ex.Message}";
         }
         finally
         {
@@ -200,49 +200,49 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         var confirmed = MessageBox.Show(
             $"{descriptor.Title}\n\n" +
-            $"Adapter: {adapter.Name}\n" +
-            $"Proposed DNS servers: {string.Join(", ", SuggestedPublicDnsServers)}\n\n" +
-            $"Risk: {descriptor.Risk}\n{descriptor.Objective}\n\n" +
-            "This will launch a separate elevated helper process and Windows will show a " +
-            "UAC prompt. You must approve it yourself for the change to take effect - this " +
-            "app cannot do that for you.\n\n" +
-            $"Rollback: {descriptor.RollbackMethod}\n\n" +
-            "Proceed?",
-            "Confirm DNS server change",
+            $"Adaptador: {adapter.Name}\n" +
+            $"Servidores DNS propuestos: {string.Join(", ", SuggestedPublicDnsServers)}\n\n" +
+            $"Riesgo: {SpanishDisplayNames.Risk(descriptor.Risk)}\n{descriptor.Objective}\n\n" +
+            "Esto va a lanzar un proceso auxiliar elevado y Windows va a mostrar un " +
+            "control de UAC. Tienes que aprobarlo tú mismo para que el cambio surta " +
+            "efecto - esta aplicación no puede hacerlo por ti.\n\n" +
+            $"Reversión: {descriptor.RollbackMethod}\n\n" +
+            "¿Continuar?",
+            "Confirmar cambio de servidores DNS",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
         if (!confirmed)
         {
-            StatusText = "DNS change cancelled - nothing was done.";
+            StatusText = "Cambio de DNS cancelado - no se hizo nada.";
             return;
         }
 
-        StatusText = "Checking preconditions...";
+        StatusText = "Comprobando condiciones previas...";
         if (!await action.CheckAsync(CancellationToken.None))
         {
-            StatusText = "Cannot apply: the selected adapter was not found, or the proposed servers failed validation.";
+            StatusText = "No se puede aplicar: no se encontró el adaptador seleccionado, o los servidores propuestos no pasaron la validación.";
             return;
         }
 
-        StatusText = "Capturing the current DNS configuration so this can be rolled back...";
+        StatusText = "Capturando la configuración DNS actual para poder revertir el cambio...";
         _lastDnsCapturedState = await action.CaptureAsync(CancellationToken.None);
         _lastDnsAction = action;
 
-        StatusText = "Applying - approve the Windows UAC prompt to continue...";
+        StatusText = "Aplicando - aprueba el control de UAC de Windows para continuar...";
         var applyResult = await action.ApplyAsync(CancellationToken.None);
         if (applyResult.Outcome == OptimizationOutcome.Failed)
         {
-            StatusText = $"DNS change failed: {applyResult.Error}";
+            StatusText = $"El cambio de DNS falló: {applyResult.Error}";
             return;
         }
 
-        StatusText = "Verifying the change took effect...";
+        StatusText = "Verificando que el cambio surtió efecto...";
         var verifyResult = await action.VerifyAsync(CancellationToken.None);
         var verified = verifyResult.Outcome == OptimizationOutcome.VerifiedImproved;
         StatusText = verified
-            ? $"DNS servers changed and verified: {verifyResult.Details}. Use Rollback to restore the previous configuration."
-            : $"DNS change applied but could not be verified ({verifyResult.Details}). Use Rollback if this isn't what you expected.";
+            ? $"Servidores DNS cambiados y verificados: {verifyResult.Details}. Usa Revertir para restaurar la configuración anterior."
+            : $"El cambio de DNS se aplicó pero no se pudo verificar ({verifyResult.Details}). Usa Revertir si esto no es lo que esperabas.";
 
         CanRollbackDns = true;
         RollbackDnsCommand.NotifyCanExecuteChanged();
@@ -254,12 +254,12 @@ public sealed partial class DashboardViewModel : ObservableObject
         if (_lastDnsAction is null || _lastDnsCapturedState is null)
             return;
 
-        StatusText = "Rolling back - approve the Windows UAC prompt to continue...";
+        StatusText = "Revirtiendo - aprueba el control de UAC de Windows para continuar...";
         var result = await _lastDnsAction.RollbackAsync(_lastDnsCapturedState, CancellationToken.None);
 
         StatusText = result.Outcome == OptimizationOutcome.RolledBack
-            ? "Rollback succeeded - DNS configuration restored to what it was before the change."
-            : $"Rollback failed: {result.Error}";
+            ? "Reversión exitosa - la configuración DNS se restauró a como estaba antes del cambio."
+            : $"La reversión falló: {result.Error}";
 
         if (result.Outcome == OptimizationOutcome.RolledBack)
         {

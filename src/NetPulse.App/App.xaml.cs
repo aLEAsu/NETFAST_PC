@@ -26,8 +26,8 @@ public partial class App : System.Windows.Application
         DispatcherUnhandledException += (_, args) =>
         {
             MessageBox.Show(
-                $"An unexpected error occurred and has been caught before it could crash the app:\n\n{args.Exception.Message}",
-                "NetPulse Optimizer - Unexpected error",
+                $"Ocurrió un error inesperado y se capturó antes de que pudiera cerrar la aplicación:\n\n{args.Exception.Message}",
+                "NetPulse Optimizer - Error inesperado",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             args.Handled = true;

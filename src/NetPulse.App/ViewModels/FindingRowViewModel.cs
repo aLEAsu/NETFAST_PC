@@ -12,7 +12,11 @@ public sealed class FindingRowViewModel
         var dns = result.DnsCheck;
 
         Target = stats.Target;
-        Confidence = finding.Confidence.ToString();
+        Confidence = SpanishDisplayNames.Confidence(finding.Confidence);
+        // Summary/Limitations come straight from ConnectionDiagnosticUseCase.Classify
+        // (Domain layer) and stay in English for now - that text is deeply covered by
+        // exact-string test assertions across NetPulse.UnitTests; translating it is a
+        // separate, larger pass, not part of this UI-chrome translation.
         Summary = finding.Summary;
         Median = $"{stats.Median.TotalMilliseconds:F1} ms";
         P95 = $"{stats.P95.TotalMilliseconds:F1} ms";
@@ -21,14 +25,14 @@ public sealed class FindingRowViewModel
         Limitations = finding.Limitations.Length > 0 ? string.Join(" | ", finding.Limitations) : "-";
 
         TcpCheck = tcp.Connected
-            ? $"Connected ({tcp.ConnectTime!.Value.TotalMilliseconds:F0} ms, port {tcp.Port})"
-            : $"Failed (port {tcp.Port}): {tcp.Error}";
+            ? $"Conectado ({tcp.ConnectTime!.Value.TotalMilliseconds:F0} ms, puerto {tcp.Port})"
+            : $"Falló (puerto {tcp.Port}): {tcp.Error}";
 
         DnsCheck = !dns.IsApplicable
-            ? "N/A (target is an IP literal)"
+            ? "N/A (el objetivo es una IP literal)"
             : dns.Resolved
-                ? $"Resolved ({dns.ResolutionTime!.Value.TotalMilliseconds:F0} ms)"
-                : $"Failed: {dns.Error}";
+                ? $"Resuelto ({dns.ResolutionTime!.Value.TotalMilliseconds:F0} ms)"
+                : $"Falló: {dns.Error}";
     }
 
     public string Target { get; }

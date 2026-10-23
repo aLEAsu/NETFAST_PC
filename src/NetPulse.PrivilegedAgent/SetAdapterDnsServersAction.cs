@@ -40,22 +40,22 @@ public sealed class SetAdapterDnsServersAction : IOptimizationAction
 
     public OptimizationDescriptor Describe() => new(
         Id: "action.set-adapter-dns-servers",
-        Title: "Set DNS servers on this adapter",
-        Objective: "Replace the adapter's configured DNS servers with the requested, validated set.",
-        Evidence: "User-selected recommendation; this action does not decide on its own that DNS is the problem.",
-        Preconditions: new[] { "The adapter exists.", "The requested server list passes DnsServerAddressValidator." },
+        Title: "Establecer servidores DNS en este adaptador",
+        Objective: "Reemplazar los servidores DNS configurados del adaptador por el conjunto solicitado y validado.",
+        Evidence: "Recomendación elegida por el usuario; esta acción no decide por sí misma que el DNS sea el problema.",
+        Preconditions: new[] { "El adaptador existe.", "La lista de servidores solicitada pasa DnsServerAddressValidator." },
         Risk: OptimizationRisk.Medium,
-        RequiredPermissions: new[] { "Administrator elevation for this one operation (UAC prompt on the elevated helper process)." },
-        VerificationMethod: "Re-read the adapter's DNS configuration after applying and confirm it matches the requested servers.",
-        SuccessCriterion: "The adapter's DNS server list exactly matches the requested list after applying.",
-        FailureCriterion: "The elevated helper reports failure, or the post-apply read does not match the requested list.",
-        RollbackMethod: "Re-apply the DNS server list captured before this action ran, through the same elevated helper.",
-        ReferenceDocumentation: new[] { "Win32_NetworkAdapterConfiguration.SetDNSServerSearchOrder (Windows WMI)." },
+        RequiredPermissions: new[] { "Elevación de administrador para esta única operación (control de UAC en el proceso auxiliar elevado)." },
+        VerificationMethod: "Volver a leer la configuración DNS del adaptador después de aplicar y confirmar que coincide con los servidores solicitados.",
+        SuccessCriterion: "La lista de servidores DNS del adaptador coincide exactamente con la solicitada después de aplicar.",
+        FailureCriterion: "El proceso auxiliar elevado reporta fallo, o la lectura posterior no coincide con la lista solicitada.",
+        RollbackMethod: "Volver a aplicar la lista de servidores DNS capturada antes de ejecutar esta acción, a través del mismo proceso auxiliar elevado.",
+        ReferenceDocumentation: new[] { "Win32_NetworkAdapterConfiguration.SetDNSServerSearchOrder (WMI de Windows)." },
         KnownLimitations: new[]
         {
-            "Changing DNS does not guarantee lower latency or fewer errors; it only changes which resolver is used.",
-            "Some networks override DNS at the router/DHCP level regardless of this setting.",
-            "Requires the user to approve a UAC prompt for the elevated helper; this action cannot and does not bypass that.",
+            "Cambiar el DNS no garantiza menor latencia ni menos errores; solo cambia qué resolutor se usa.",
+            "Algunas redes sobrescriben el DNS a nivel de router/DHCP sin importar esta configuración.",
+            "Requiere que el usuario apruebe un control de UAC para el proceso auxiliar elevado; esta acción no puede ni intenta evitarlo.",
         });
 
     public async Task<bool> CheckAsync(CancellationToken cancellationToken)
@@ -118,7 +118,7 @@ public sealed class SetAdapterDnsServersAction : IOptimizationAction
             Describe().Id,
             matches ? OptimizationOutcome.VerifiedImproved : OptimizationOutcome.VerifiedInconclusive,
             DateTimeOffset.UtcNow,
-            $"Observed DNS servers: {string.Join(",", currentServers)}",
+            $"Servidores DNS observados: {string.Join(",", currentServers)}",
             null);
     }
 

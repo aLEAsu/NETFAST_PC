@@ -32,7 +32,7 @@ public class FindingRowViewModelTests
 
         Assert.Contains("12", row.TcpCheck);
         Assert.Contains("443", row.TcpCheck);
-        Assert.Contains("Connected", row.TcpCheck);
+        Assert.Contains("Conectado", row.TcpCheck);
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class FindingRowViewModelTests
         var dns = DnsResolutionSample.NotApplicable("203.0.113.1");
         var row = new FindingRowViewModel(new DiagnosticRunResult(Stats("203.0.113.1"), Finding(), tcp, dns));
 
-        Assert.Contains("Failed", row.TcpCheck);
+        Assert.Contains("Falló", row.TcpCheck);
         Assert.Contains("Connection timed out", row.TcpCheck);
         Assert.Contains("443", row.TcpCheck);
     }
@@ -55,7 +55,7 @@ public class FindingRowViewModelTests
         var row = new FindingRowViewModel(new DiagnosticRunResult(Stats("1.1.1.1"), Finding(), tcp, dns));
 
         Assert.Contains("N/A", row.DnsCheck);
-        Assert.DoesNotContain("Failed", row.DnsCheck);
+        Assert.DoesNotContain("Falló", row.DnsCheck);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class FindingRowViewModelTests
         var row = new FindingRowViewModel(new DiagnosticRunResult(Stats("example.com"), Finding(), tcp, dns));
 
         Assert.Contains("45", row.DnsCheck);
-        Assert.Contains("Resolved", row.DnsCheck);
+        Assert.Contains("Resuelto", row.DnsCheck);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class FindingRowViewModelTests
         var dns = new DnsResolutionSample("bad.example", Now, Resolved: false, ResolutionTime: null, Array.Empty<string>(), Error: "Name resolution failed");
         var row = new FindingRowViewModel(new DiagnosticRunResult(Stats("bad.example"), Finding(), tcp, dns));
 
-        Assert.Contains("Failed", row.DnsCheck);
+        Assert.Contains("Falló", row.DnsCheck);
         Assert.Contains("Name resolution failed", row.DnsCheck);
     }
 }

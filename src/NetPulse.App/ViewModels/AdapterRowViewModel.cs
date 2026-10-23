@@ -10,11 +10,11 @@ public sealed class AdapterRowViewModel
         Id = info.Id;
         Name = info.Name;
         Description = info.Description;
-        Kind = info.Kind.ToString();
-        Status = info.IsUp ? "Up" : "Down";
+        Kind = TranslateKind(info.Kind);
+        Status = info.IsUp ? "Activo" : "Inactivo";
         Speed = info.NegotiatedSpeedBitsPerSecond > 0
             ? $"{info.NegotiatedSpeedBitsPerSecond / 1_000_000} Mbps"
-            : "Unknown";
+            : "Desconocida";
         IPv4 = info.IPv4Addresses.Length > 0 ? string.Join(", ", info.IPv4Addresses) : "-";
         Gateway = info.Gateway ?? "-";
         Dns = info.DnsServers.Length > 0 ? string.Join(", ", info.DnsServers) : "-";
@@ -31,4 +31,14 @@ public sealed class AdapterRowViewModel
     public string Gateway { get; }
     public string Dns { get; }
     public string Mtu { get; }
+
+    private static string TranslateKind(AdapterKind kind) => kind switch
+    {
+        AdapterKind.Ethernet => "Ethernet",
+        AdapterKind.Wireless => "Wi-Fi",
+        AdapterKind.UsbEthernet => "Ethernet por USB",
+        AdapterKind.Loopback => "Loopback",
+        AdapterKind.Other => "Otro",
+        _ => kind.ToString(),
+    };
 }

@@ -241,6 +241,21 @@ followed for DNS.
 - **Second `IOptimizationAction`.** Before adding one, do the small refactor
   `05-code-audit-and-recommendations.md` §3 recommends (a lookup table from recommendation
   id → action factory) rather than growing `if` branches in `DashboardViewModel`.
+- **UI is now partly in Spanish - deliberately, partially.** At the user's request,
+  `NetPulse.App`'s chrome (window title, labels, buttons, status messages, the DNS
+  confirmation dialog, the global error dialog) and the enum displays in the three row
+  ViewModels (`SpanishDisplayNames.Risk`/`Confidence`, plus `AdapterKind`/Status/Speed in
+  `AdapterRowViewModel`) are in Spanish. `DiagnosticProfileCatalog`'s `DisplayName`/`Focus`
+  text is also Spanish now (safe - no test checks its exact content, only non-emptiness).
+  **Deliberately left in English:** every string that comes out of
+  `ConnectionDiagnosticUseCase.Classify` (`DiagnosticFinding.Summary`/`Evidence`/
+  `Limitations`) and the 6 recommendation rules' `OptimizationDescriptor` fields
+  (`Title`/`Objective`/`VerificationMethod`/etc.) - those are covered by ~100 exact-string
+  test assertions across `NetPulse.UnitTests`, and translating them is a separate, larger
+  pass (would mean touching every rule file and its tests in lockstep), not something to
+  do as a quick follow-on. If full localization is wanted, that Domain-layer pass - plus
+  deciding whether to keep English as a fallback/second language rather than replacing it
+  outright - is the next step, not an extension of this one.
 
 ## 8. Working method (how this project has been built so far - keep doing this)
 
