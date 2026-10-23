@@ -8,6 +8,7 @@ public sealed class AdapterRowViewModel
     public AdapterRowViewModel(NetworkAdapterInfo info)
     {
         Id = info.Id;
+        IsVirtual = info.IsVirtual;
         Name = info.Name;
         Description = info.Description;
         Kind = TranslateKind(info.Kind);
@@ -22,6 +23,12 @@ public sealed class AdapterRowViewModel
     }
 
     public string Id { get; }
+
+    /// <summary>True for Windows' built-in virtual/tunnel adapters (WAN Miniport, 6to4,
+    /// Teredo, ISATAP, loopback) - never a real NIC. Drives the "show virtual adapters"
+    /// filter in the dashboard; not shown as its own grid column.</summary>
+    public bool IsVirtual { get; }
+
     public string Name { get; }
     public string Description { get; }
     public string Kind { get; }
@@ -38,6 +45,7 @@ public sealed class AdapterRowViewModel
         AdapterKind.Wireless => "Wi-Fi",
         AdapterKind.UsbEthernet => "Ethernet por USB",
         AdapterKind.Loopback => "Loopback",
+        AdapterKind.Tunnel => "Túnel (virtual)",
         AdapterKind.Other => "Otro",
         _ => kind.ToString(),
     };

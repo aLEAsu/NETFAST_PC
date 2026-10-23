@@ -62,7 +62,40 @@ public sealed class NetworkAdapterInventoryService : INetworkAdapterInventorySer
             Gateway: props.GatewayAddresses.Select(g => g.Address.ToString()).FirstOrDefault(),
             Mtu: SafeMtu(props),
             BytesSent: stats?.BytesSent ?? 0,
-            BytesReceived: stats?.BytesReceived ?? 0);
+            BytesReceived: stats?.BytesReceived ?? 0,
+            IsVirtual: IsVirtualAdapter(nic));
+    }
+
+    /// <summary>
+    /// Windows' Remote Access service always installs several "WAN Miniport" virtual
+    /// adapters (for PPTP/L2TP/SSTP/IKEv2/IP/IPv6/Network Monitor) regardless of whether the
+    /// user has ever used a VPN, plus tunnel pseudo-interfaces (6to4/Teredo/ISATAP) and the
+    /// loopback interface - all returned by the same API as real NICs. None of these marker
+    /// strings/types is proof the device driver author used that exact wording, but they
+    /// cover every virtual adapter Windows itself creates out of the box, which is what this
+    /// classification exists to filter out of the default view.
+    /// </summary>
+    private static readonly string[] VirtualDescriptionMarkers =
+    {
+        "WAN Miniport",
+        "6to4 Adapter",
+        "Teredo Tunneling",
+        "ISATAP",
+        "Microsoft Kernel Debug Network Adapter",
+        "Microsoft Wi-Fi Direct Virtual Adapter",
+        "RAS Async Adapter",
+        "Virtual Switch",
+        "Hyper-V Virtual Ethernet Adapter",
+        "TAP-Windows",
+    };
+
+    private static bool IsVirtualAdapter(NetworkInterface nic)
+    {
+        if (nic.NetworkInterfaceType is NetworkInterfaceType.Tunnel or NetworkInterfaceType.Loopback)
+            return true;
+
+        return VirtualDescriptionMarkers.Any(marker =>
+            nic.Description.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
     private static int SafeMtu(IPInterfaceProperties props)
@@ -85,6 +118,9 @@ public sealed class NetworkAdapterInventoryService : INetworkAdapterInventorySer
     {
         if (nic.NetworkInterfaceType == NetworkInterfaceType.Loopback)
             return AdapterKind.Loopback;
+
+        if (nic.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+            return AdapterKind.Tunnel;
 
         if (nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
             return AdapterKind.Wireless;

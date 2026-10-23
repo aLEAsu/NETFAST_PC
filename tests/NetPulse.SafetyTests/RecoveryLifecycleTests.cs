@@ -25,7 +25,7 @@ public class RecoveryLifecycleTests
             {
                 new NetworkAdapterInfo(ValidAdapterId, "Ethernet", "Test Adapter", AdapterKind.Ethernet, true,
                     1_000_000_000, new[] { "192.168.1.50" }, Array.Empty<string>(), Array.Empty<string>(),
-                    "192.168.1.1", 1500, 0, 0),
+                    "192.168.1.1", 1500, 0, 0, IsVirtual: false),
             });
     }
 

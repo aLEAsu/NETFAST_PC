@@ -6,10 +6,11 @@
         xmlns:local="clr-namespace:NetPulse.App"
         xmlns:converters="clr-namespace:NetPulse.App.Converters"
         mc:Ignorable="d"
-        Title="NetPulse Optimizer" Height="800" Width="1150"
+        Title="NetPulse Optimizer" Height="850" Width="1250"
         Background="#1E1F24">
     <Window.Resources>
         <converters:DiagnosticProfileToSpanishNameConverter x:Key="ProfileNameConverter"/>
+        <converters:StatusSeverityToBrushConverter x:Key="StatusSeverityConverter"/>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#E8E8EA"/>
         </Style>
@@ -21,9 +22,33 @@
             <Setter Property="GridLinesVisibility" Value="None"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="AutoGenerateColumns" Value="True"/>
+            <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
             <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowHeaderWidth" Value="0"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#33343C"/>
+            <Setter Property="Foreground" Value="#E8E8EA"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <!-- Explicit columns everywhere (no AutoGenerateColumns) because that mode sizes
+             every column to its header text and never wraps, which is what was cutting off
+             long adapter/finding/recommendation text in the grids. -->
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#3C5A80"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="WrappingCellStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="#E8E8EA"/>
         </Style>
     </Window.Resources>
 
@@ -40,7 +65,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="NetPulse Optimizer" FontSize="22" FontWeight="Bold"/>
             <TextBlock Text="Diagnóstico + recomendaciones. La mayoría de las recomendaciones son solo informativas. Una (servidores DNS) se puede aplicar abajo - siempre pide confirmación primero y requiere aprobar un control de UAC de Windows antes de cambiar algo."
-                       FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0"/>
+                       FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
         <Border Grid.Row="1" Background="#26272E" Padding="12" CornerRadius="4" Margin="0,0,0,12">
@@ -67,16 +92,45 @@
                     <Button Content="Ejecutar diagnóstico" Command="{Binding RunDiagnosticCommand}" Margin="16,0,0,0" Padding="12,4"/>
                     <Button Content="Cancelar" Command="{Binding CancelDiagnosticCommand}" Margin="8,0,0,0" Padding="12,4"/>
                     <Button Content="Actualizar adaptadores" Command="{Binding LoadAdaptersCommand}" Margin="8,0,0,0" Padding="12,4"/>
+
+                    <CheckBox Content="Mostrar adaptadores virtuales de Windows (WAN Miniport, 6to4, etc.)"
+                              IsChecked="{Binding ShowVirtualAdapters}"
+                              VerticalAlignment="Center" Margin="20,0,0,0" Foreground="#E8E8EA"/>
                 </StackPanel>
             </StackPanel>
         </Border>
 
-        <GroupBox Grid.Row="2" Header="Adaptadores de red (inventario de solo lectura - selecciona uno para poder aplicar una recomendación de DNS abajo)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" SelectionMode="Single" SelectionUnit="FullRow"/>
+        <GroupBox Grid.Row="2" Header="Adaptadores de red (inventario de solo lectura - selecciona uno para poder aplicar una recomendación de DNS abajo; los adaptadores virtuales de Windows están ocultos por defecto)" Margin="0,0,0,12" Foreground="#E8E8EA">
+            <DataGrid ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" SelectionMode="Single" SelectionUnit="FullRow">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Nombre" Binding="{Binding Name}" Width="1.3*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Descripción" Binding="{Binding Description}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Tipo" Binding="{Binding Kind}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Estado" Binding="{Binding Status}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Velocidad" Binding="{Binding Speed}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="IPv4" Binding="{Binding IPv4}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Puerta de enlace" Binding="{Binding Gateway}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="DNS" Binding="{Binding Dns}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="MTU" Binding="{Binding Mtu}" Width="0.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                </DataGrid.Columns>
+            </DataGrid>
         </GroupBox>
 
         <GroupBox Grid.Row="3" Header="Resultados del diagnóstico (etiquetados por nivel de confianza; no son garantía de la causa)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Findings}"/>
+            <DataGrid ItemsSource="{Binding Findings}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Confianza" Binding="{Binding Confidence}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Resumen" Binding="{Binding Summary}" Width="2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Mediana" Binding="{Binding Median}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="P95" Binding="{Binding P95}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Jitter" Binding="{Binding Jitter}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Pérdida" Binding="{Binding Loss}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="TCP" Binding="{Binding TcpCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="DNS" Binding="{Binding DnsCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                </DataGrid.Columns>
+            </DataGrid>
         </GroupBox>
 
         <GroupBox Grid.Row="4" Header="Recomendaciones - nada se aplica automáticamente; solo la de DNS se puede aplicar, y solo después de confirmar y aprobar un control de UAC" Foreground="#E8E8EA">
@@ -85,7 +139,17 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <DataGrid Grid.Row="0" ItemsSource="{Binding Recommendations}"/>
+                <DataGrid Grid.Row="0" ItemsSource="{Binding Recommendations}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Título" Binding="{Binding Title}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Riesgo" Binding="{Binding Risk}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Confianza" Binding="{Binding BasisConfidence}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Por qué se activó" Binding="{Binding Explanation}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Cómo verificarlo" Binding="{Binding NextStep}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
                 <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="Aplicar servidores DNS sugeridos (1.1.1.1, 8.8.8.8)" Command="{Binding ApplyDnsRecommendationCommand}" Padding="12,4"/>
                     <Button Content="Revertir cambio de DNS" Command="{Binding RollbackDnsCommand}" Margin="8,0,0,0" Padding="12,4"/>
@@ -93,6 +157,8 @@
             </Grid>
         </GroupBox>
 
-        <TextBlock Grid.Row="5" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic" Foreground="#B5B5BD"/>
+        <TextBlock Grid.Row="5" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic"
+                    Foreground="{Binding StatusSeverity, Converter={StaticResource StatusSeverityConverter}}"
+                    TextWrapping="Wrap"/>
     </Grid>
 </Window>

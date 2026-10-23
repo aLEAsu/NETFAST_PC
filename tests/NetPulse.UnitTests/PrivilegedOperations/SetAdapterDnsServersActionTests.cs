@@ -66,7 +66,7 @@ public class SetAdapterDnsServersActionTests
         id, "Ethernet", "Test Adapter", AdapterKind.Ethernet, IsUp: true,
         NegotiatedSpeedBitsPerSecond: 1_000_000_000,
         IPv4Addresses: new[] { "192.168.1.50" }, IPv6Addresses: Array.Empty<string>(),
-        DnsServers: Array.Empty<string>(), Gateway: "192.168.1.1", Mtu: 1500, BytesSent: 0, BytesReceived: 0);
+        DnsServers: Array.Empty<string>(), Gateway: "192.168.1.1", Mtu: 1500, BytesSent: 0, BytesReceived: 0, IsVirtual: false);
 
     [Fact]
     public async Task CheckAsync_AdapterExistsAndInputsAreValid_ReturnsTrue()

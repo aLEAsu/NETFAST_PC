@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NetPulse.Application.Ports;
 using NetPulse.Application.UseCases;
+using NetPulse.Domain.Network;
 using NetPulse.Domain.Optimization;
 using NetPulse.Domain.Profiles;
 using NetPulse.PrivilegedAgent;
@@ -27,6 +28,11 @@ public sealed partial class DashboardViewModel : ObservableObject
     private CancellationTokenSource? _runCancellation;
     private SetAdapterDnsServersAction? _lastDnsAction;
     private string? _lastDnsCapturedState;
+
+    // The full, unfiltered inventory from the last refresh - Adapters (the bindable
+    // collection the grid shows) is a filtered view over this, re-applied whenever
+    // ShowVirtualAdapters changes, without re-querying the OS.
+    private List<AdapterRowViewModel> _allAdapters = new();
 
     public DashboardViewModel(
         INetworkAdapterInventoryService adapterInventory,
@@ -66,6 +72,9 @@ public sealed partial class DashboardViewModel : ObservableObject
     private string _statusText = "Listo. Todavía no se ha ejecutado ningún diagnóstico.";
 
     [ObservableProperty]
+    private StatusSeverity _statusSeverity = StatusSeverity.Info;
+
+    [ObservableProperty]
     private bool _isRunning;
 
     [ObservableProperty]
@@ -75,11 +84,30 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRollbackDns;
 
+    /// <summary>
+    /// Off by default: Windows always exposes several virtual "WAN Miniport" adapters (one
+    /// per VPN protocol it supports) plus tunnel pseudo-interfaces (6to4/Teredo/ISATAP),
+    /// through the exact same API as real NICs - a machine with one real Wi-Fi adapter
+    /// commonly shows 8-10 entries if none of this is filtered. None of those virtual
+    /// adapters is ever useful for diagnosing a real network problem, so they start hidden;
+    /// toggling this shows them without re-reading anything from the OS.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showVirtualAdapters;
+
     partial void OnSelectedProfileChanged(DiagnosticProfile value)
     {
         var settings = DiagnosticProfileCatalog.Get(value);
         SampleCount = settings.SampleCount;
         ProfileFocusText = settings.Focus;
+    }
+
+    partial void OnShowVirtualAdaptersChanged(bool value) => ApplyAdapterFilter();
+
+    private void SetStatus(string text, StatusSeverity severity = StatusSeverity.Info)
+    {
+        StatusText = text;
+        StatusSeverity = severity;
     }
 
     [RelayCommand]
@@ -90,21 +118,35 @@ public sealed partial class DashboardViewModel : ObservableObject
         // unhandled exception here would crash the whole app via WPF's unhandled-exception
         // path rather than show an error, so every failure must be caught, not just the
         // ones in RunDiagnosticAsync.
-        StatusText = "Leyendo inventario de adaptadores...";
-        Adapters.Clear();
+        SetStatus("Leyendo inventario de adaptadores...", StatusSeverity.Progress);
 
         try
         {
             var adapters = await _adapterInventory.GetAdaptersAsync(CancellationToken.None);
-            foreach (var adapter in adapters)
-                Adapters.Add(new AdapterRowViewModel(adapter));
+            _allAdapters = adapters.Select(a => new AdapterRowViewModel(a)).ToList();
+            ApplyAdapterFilter();
 
-            StatusText = $"Se cargaron {Adapters.Count} adaptador(es). Esto es solo lectura - no se cambió nada.";
+            var virtualCount = _allAdapters.Count(a => a.IsVirtual);
+            var hiddenNote = !ShowVirtualAdapters && virtualCount > 0
+                ? $" ({virtualCount} adaptador(es) virtual(es) de Windows oculto(s) - activa \"Mostrar virtuales\" para verlos)"
+                : string.Empty;
+            SetStatus($"Se cargaron {Adapters.Count} adaptador(es){hiddenNote}. Esto es solo lectura - no se cambió nada.", StatusSeverity.Success);
         }
         catch (Exception ex)
         {
-            StatusText = $"No se pudo leer el inventario de adaptadores: {ex.Message}";
+            SetStatus($"No se pudo leer el inventario de adaptadores: {ex.Message}", StatusSeverity.Error);
         }
+    }
+
+    private void ApplyAdapterFilter()
+    {
+        var previouslySelectedId = SelectedAdapter?.Id;
+
+        Adapters.Clear();
+        foreach (var adapter in _allAdapters.Where(a => ShowVirtualAdapters || !a.IsVirtual))
+            Adapters.Add(adapter);
+
+        SelectedAdapter = Adapters.FirstOrDefault(a => a.Id == previouslySelectedId);
     }
 
     private bool CanRunDiagnostic() => !IsRunning;
@@ -118,14 +160,14 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         if (targets.Count == 0)
         {
-            StatusText = "Ingresa al menos un objetivo (dirección IP u hostname) antes de ejecutar un diagnóstico.";
+            SetStatus("Ingresa al menos un objetivo (dirección IP u hostname) antes de ejecutar un diagnóstico.", StatusSeverity.Warning);
             return;
         }
 
         IsRunning = true;
         RunDiagnosticCommand.NotifyCanExecuteChanged();
         _runCancellation = new CancellationTokenSource();
-        StatusText = $"Ejecutando {SampleCount} sondeos contra {targets.Count} objetivo(s)...";
+        SetStatus($"Ejecutando {SampleCount} sondeos contra {targets.Count} objetivo(s)...", StatusSeverity.Progress);
         Findings.Clear();
         Recommendations.Clear();
         CanRollbackDns = false;
@@ -151,15 +193,17 @@ public sealed partial class DashboardViewModel : ObservableObject
 
             ApplyDnsRecommendationCommand.NotifyCanExecuteChanged();
 
-            StatusText = $"Diagnóstico completo a las {DateTimeOffset.Now:T}. {results.Count} objetivo(s) evaluados, {Recommendations.Count} recomendación(es).";
+            SetStatus(
+                $"Diagnóstico completo a las {DateTimeOffset.Now:T}. {results.Count} objetivo(s) evaluados, {Recommendations.Count} recomendación(es).",
+                StatusSeverity.Success);
         }
         catch (OperationCanceledException)
         {
-            StatusText = "Diagnóstico cancelado.";
+            SetStatus("Diagnóstico cancelado.", StatusSeverity.Warning);
         }
         catch (Exception ex)
         {
-            StatusText = $"El diagnóstico falló: {ex.Message}";
+            SetStatus($"El diagnóstico falló: {ex.Message}", StatusSeverity.Error);
         }
         finally
         {
@@ -214,35 +258,37 @@ public sealed partial class DashboardViewModel : ObservableObject
 
         if (!confirmed)
         {
-            StatusText = "Cambio de DNS cancelado - no se hizo nada.";
+            SetStatus("Cambio de DNS cancelado - no se hizo nada.", StatusSeverity.Info);
             return;
         }
 
-        StatusText = "Comprobando condiciones previas...";
+        SetStatus("Comprobando condiciones previas...", StatusSeverity.Progress);
         if (!await action.CheckAsync(CancellationToken.None))
         {
-            StatusText = "No se puede aplicar: no se encontró el adaptador seleccionado, o los servidores propuestos no pasaron la validación.";
+            SetStatus("No se puede aplicar: no se encontró el adaptador seleccionado, o los servidores propuestos no pasaron la validación.", StatusSeverity.Error);
             return;
         }
 
-        StatusText = "Capturando la configuración DNS actual para poder revertir el cambio...";
+        SetStatus("Capturando la configuración DNS actual para poder revertir el cambio...", StatusSeverity.Progress);
         _lastDnsCapturedState = await action.CaptureAsync(CancellationToken.None);
         _lastDnsAction = action;
 
-        StatusText = "Aplicando - aprueba el control de UAC de Windows para continuar...";
+        SetStatus("Aplicando - aprueba el control de UAC de Windows para continuar...", StatusSeverity.Progress);
         var applyResult = await action.ApplyAsync(CancellationToken.None);
         if (applyResult.Outcome == OptimizationOutcome.Failed)
         {
-            StatusText = $"El cambio de DNS falló: {applyResult.Error}";
+            SetStatus($"El cambio de DNS falló: {applyResult.Error}", StatusSeverity.Error);
             return;
         }
 
-        StatusText = "Verificando que el cambio surtió efecto...";
+        SetStatus("Verificando que el cambio surtió efecto...", StatusSeverity.Progress);
         var verifyResult = await action.VerifyAsync(CancellationToken.None);
         var verified = verifyResult.Outcome == OptimizationOutcome.VerifiedImproved;
-        StatusText = verified
-            ? $"Servidores DNS cambiados y verificados: {verifyResult.Details}. Usa Revertir para restaurar la configuración anterior."
-            : $"El cambio de DNS se aplicó pero no se pudo verificar ({verifyResult.Details}). Usa Revertir si esto no es lo que esperabas.";
+        SetStatus(
+            verified
+                ? $"Servidores DNS cambiados y verificados: {verifyResult.Details}. Usa Revertir para restaurar la configuración anterior."
+                : $"El cambio de DNS se aplicó pero no se pudo verificar ({verifyResult.Details}). Usa Revertir si esto no es lo que esperabas.",
+            verified ? StatusSeverity.Success : StatusSeverity.Warning);
 
         CanRollbackDns = true;
         RollbackDnsCommand.NotifyCanExecuteChanged();
@@ -254,12 +300,14 @@ public sealed partial class DashboardViewModel : ObservableObject
         if (_lastDnsAction is null || _lastDnsCapturedState is null)
             return;
 
-        StatusText = "Revirtiendo - aprueba el control de UAC de Windows para continuar...";
+        SetStatus("Revirtiendo - aprueba el control de UAC de Windows para continuar...", StatusSeverity.Progress);
         var result = await _lastDnsAction.RollbackAsync(_lastDnsCapturedState, CancellationToken.None);
 
-        StatusText = result.Outcome == OptimizationOutcome.RolledBack
-            ? "Reversión exitosa - la configuración DNS se restauró a como estaba antes del cambio."
-            : $"La reversión falló: {result.Error}";
+        SetStatus(
+            result.Outcome == OptimizationOutcome.RolledBack
+                ? "Reversión exitosa - la configuración DNS se restauró a como estaba antes del cambio."
+                : $"La reversión falló: {result.Error}",
+            result.Outcome == OptimizationOutcome.RolledBack ? StatusSeverity.Success : StatusSeverity.Error);
 
         if (result.Outcome == OptimizationOutcome.RolledBack)
         {

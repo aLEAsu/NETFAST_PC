@@ -75,4 +75,52 @@ public class NetworkAdapterInventoryServiceTests
 
         Assert.All(adapters, a => Assert.True(a.Mtu >= 0));
     }
+
+    [Fact]
+    public async Task GetAdaptersAsync_LoopbackIsFlaggedVirtual()
+    {
+        // Every Windows machine has this one, so it is a reliable, always-present anchor
+        // for the IsVirtual classification - unlike WAN Miniports/6to4, whose exact count
+        // varies by machine and by what networking features/VPN clients are installed.
+        var adapters = await Service.GetAdaptersAsync(CancellationToken.None);
+
+        Assert.All(adapters.Where(a => a.Kind == AdapterKind.Loopback), a => Assert.True(a.IsVirtual));
+    }
+
+    [Fact]
+    public async Task GetAdaptersAsync_EveryTunnelKindAdapterIsFlaggedVirtual()
+    {
+        var adapters = await Service.GetAdaptersAsync(CancellationToken.None);
+
+        Assert.All(adapters.Where(a => a.Kind == AdapterKind.Tunnel), a => Assert.True(a.IsVirtual));
+    }
+
+    [Fact]
+    public async Task GetAdaptersAsync_WanMiniportAdaptersAreFlaggedVirtual()
+    {
+        // Windows' Remote Access service always installs several "WAN Miniport" pseudo-
+        // adapters (one per VPN protocol it supports) whether or not the user has ever used
+        // a VPN - these are exactly the entries the user's screenshot showed cluttering the
+        // adapter list ("Conexión de área local* N"). This test only asserts something when
+        // the host machine actually has them, since a stripped-down or non-Windows-standard
+        // install might not.
+        var adapters = await Service.GetAdaptersAsync(CancellationToken.None);
+
+        var wanMiniports = adapters.Where(a => a.Description.Contains("WAN Miniport", StringComparison.OrdinalIgnoreCase));
+
+        Assert.All(wanMiniports, a => Assert.True(a.IsVirtual));
+    }
+
+    [Fact]
+    public async Task GetAdaptersAsync_AtLeastOneRealNonVirtualAdapterExists()
+    {
+        // Guards the opposite failure mode: a classifier so eager it flags everything as
+        // virtual would silently empty the default (filtered) view in the dashboard, making
+        // the app look broken even though adapters exist. Every machine this runs on has a
+        // real physical or host-level adapter (Ethernet/Wi-Fi/USB Ethernet) besides loopback
+        // and the virtual pseudo-adapters.
+        var adapters = await Service.GetAdaptersAsync(CancellationToken.None);
+
+        Assert.Contains(adapters, a => !a.IsVirtual);
+    }
 }
