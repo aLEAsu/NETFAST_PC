@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Visual Studio / Rider
+.vs/
+.idea/
+
+## Local data produced by NetPulse itself at runtime
+*.db
+*.db-journal
+
+## OS
+Thumbs.db
+.DS_Store

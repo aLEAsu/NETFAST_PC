@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NetPulse.App/NetPulse.App.csproj" />
+    <Project Path="src/NetPulse.Application/NetPulse.Application.csproj" />
+    <Project Path="src/NetPulse.Domain/NetPulse.Domain.csproj" />
+    <Project Path="src/NetPulse.Infrastructure.Windows/NetPulse.Infrastructure.Windows.csproj" />
+    <Project Path="src/NetPulse.Persistence/NetPulse.Persistence.csproj" />
+    <Project Path="src/NetPulse.PrivilegedAgent/NetPulse.PrivilegedAgent.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NetPulse.IntegrationTests/NetPulse.IntegrationTests.csproj" />
+    <Project Path="tests/NetPulse.PerformanceTests/NetPulse.PerformanceTests.csproj" />
+    <Project Path="tests/NetPulse.SafetyTests/NetPulse.SafetyTests.csproj" />
+    <Project Path="tests/NetPulse.UnitTests/NetPulse.UnitTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,67 @@
+﻿<Window x:Class="NetPulse.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:NetPulse.App"
+        mc:Ignorable="d"
+        Title="NetPulse Optimizer - Diagnostic Prototype (Phase 3)" Height="680" Width="1100"
+        Background="#1E1F24">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#E8E8EA"/>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="#26272E"/>
+            <Setter Property="Foreground" Value="#E8E8EA"/>
+            <Setter Property="RowBackground" Value="#26272E"/>
+            <Setter Property="AlternatingRowBackground" Value="#2E2F37"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="AutoGenerateColumns" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="NetPulse Optimizer" FontSize="22" FontWeight="Bold"/>
+            <TextBlock Text="Diagnostics-only prototype. No network or system settings are modified by this build."
+                       FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Background="#26272E" Padding="12" CornerRadius="4" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Targets (comma-separated):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBox Text="{Binding TargetsText, UpdateSourceTrigger=PropertyChanged}" Width="260" VerticalAlignment="Center"/>
+
+                <TextBlock Text="Samples per target:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                <TextBox Text="{Binding SampleCount, UpdateSourceTrigger=PropertyChanged}" Width="60" VerticalAlignment="Center"/>
+
+                <Button Content="Run diagnostic" Command="{Binding RunDiagnosticCommand}" Margin="16,0,0,0" Padding="12,4"/>
+                <Button Content="Cancel" Command="{Binding CancelDiagnosticCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                <Button Content="Refresh adapters" Command="{Binding LoadAdaptersCommand}" Margin="8,0,0,0" Padding="12,4"/>
+            </StackPanel>
+        </Border>
+
+        <GroupBox Grid.Row="2" Header="Network adapters (read-only inventory)" Margin="0,0,0,12" Foreground="#E8E8EA">
+            <DataGrid ItemsSource="{Binding Adapters}"/>
+        </GroupBox>
+
+        <GroupBox Grid.Row="3" Header="Diagnostic findings (confidence-labeled; not a guarantee of cause)" Foreground="#E8E8EA">
+            <DataGrid ItemsSource="{Binding Findings}"/>
+        </GroupBox>
+
+        <TextBlock Grid.Row="4" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic" Foreground="#B5B5BD"/>
+    </Grid>
+</Window>
