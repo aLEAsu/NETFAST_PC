@@ -57,6 +57,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="0.7*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -116,7 +117,25 @@
             </DataGrid>
         </GroupBox>
 
-        <GroupBox Grid.Row="3" Header="Resultados del diagnóstico (etiquetados por nivel de confianza; no son garantía de la causa)" Margin="0,0,0,12" Foreground="#E8E8EA">
+        <GroupBox Grid.Row="3" Header="Propiedades avanzadas del adaptador seleccionado (RSS, descargas de hardware, EEE, etc. - solo lectura, informativo, nada se puede cambiar aquí)" Margin="0,0,0,12" Foreground="#E8E8EA">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <DataGrid Grid.Row="0" ItemsSource="{Binding AdvancedProperties}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Propiedad" Binding="{Binding DisplayName}" Width="1.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Valor" Binding="{Binding DisplayValue}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Clave de registro" Binding="{Binding Keyword}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                        <DataGridTextColumn Header="Valor crudo" Binding="{Binding RawValue}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <TextBlock Grid.Row="1" Text="{Binding AdvancedPropertiesStatusText}" Margin="0,6,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap"/>
+            </Grid>
+        </GroupBox>
+
+        <GroupBox Grid.Row="4" Header="Resultados del diagnóstico (etiquetados por nivel de confianza; no son garantía de la causa)" Margin="0,0,0,12" Foreground="#E8E8EA">
             <DataGrid ItemsSource="{Binding Findings}">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
@@ -133,7 +152,7 @@
             </DataGrid>
         </GroupBox>
 
-        <GroupBox Grid.Row="4" Header="Recomendaciones - nada se aplica automáticamente; solo la de DNS se puede aplicar, y solo después de confirmar y aprobar un control de UAC" Foreground="#E8E8EA">
+        <GroupBox Grid.Row="5" Header="Recomendaciones - nada se aplica automáticamente; solo la de DNS se puede aplicar, y solo después de confirmar y aprobar un control de UAC" Foreground="#E8E8EA">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
@@ -157,7 +176,7 @@
             </Grid>
         </GroupBox>
 
-        <TextBlock Grid.Row="5" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic"
+        <TextBlock Grid.Row="6" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic"
                     Foreground="{Binding StatusSeverity, Converter={StaticResource StatusSeverityConverter}}"
                     TextWrapping="Wrap"/>
     </Grid>

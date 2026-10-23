@@ -17,8 +17,8 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
 
 ## 2. What is actually true right now (verified, not claimed)
 
-- Builds clean, 0 errors/0 warnings. 153 tests pass across four suites: ~104 unit (fakes),
-  ~40 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read, plus `NetPulse.App`'s
+- Builds clean, 0 errors/0 warnings. 163 tests pass across four suites: 104 unit (fakes),
+  50 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read, plus `NetPulse.App`'s
   `FindingRowViewModel`), 5 safety (recovery lifecycle, fakes), 4 performance (real
   CPU/allocation benchmarks). Re-run all four before trusting this number - it will have
   moved by the time you read this.
@@ -36,9 +36,19 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
   a self-signed test certificate; there is no certificate any real machine would trust.
 - Profiles (Module H) exist: 6 fixed profiles adjusting diagnostic parameters and
   recommendation ordering only.
+- **Module C (advanced NIC properties) is now implemented**, read-only, exactly per §6.4's
+  plan: `IAdapterAdvancedPropertiesReader`/`WmiAdapterAdvancedPropertiesReader` query
+  `MSFT_NetAdapterAdvancedPropertySettingData` in `root\StandardCimv2` (note: that class has
+  no `InterfaceGuid` property - the adapter GUID is the prefix of `InstanceID`, e.g.
+  `{GUID}::*EEE` - verified against this machine's real Ethernet adapter via
+  `Get-CimInstance` after the first query attempt failed with "invalid query"). The
+  dashboard shows the selected adapter's properties (RSS, EEE, offloads, etc.) in a new
+  read-only grid, refreshed automatically on selection change. No write path exists at all,
+  per the brief's explicit instruction not to add one in this pass. 6 new real integration
+  tests in `WmiAdapterAdvancedPropertiesReaderTests.cs`.
 - **Not implemented at all:** bufferbloat active-load testing (Module E), per-process
-  bandwidth accounting (Module F), pktmon/ETW advanced diagnostics (Module G), advanced NIC
-  properties - RSS/offloads/EEE/etc. (part of Module C), WinUI 3 migration.
+  bandwidth accounting (Module F), pktmon/ETW advanced diagnostics (Module G), WinUI 3
+  migration.
 
 If any of the above sounds wrong when you check it, trust the code and the test run over
 this document - re-verify, don't assume.

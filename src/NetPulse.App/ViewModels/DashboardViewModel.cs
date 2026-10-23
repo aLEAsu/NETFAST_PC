@@ -23,6 +23,7 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly ConnectionDiagnosticUseCase _connectionDiagnostic;
     private readonly GenerateRecommendationsUseCase _generateRecommendations;
     private readonly IAdapterDnsConfigurationReader _dnsReader;
+    private readonly IAdapterAdvancedPropertiesReader _advancedPropertiesReader;
     private readonly IElevatedOperationLauncher _elevatedLauncher;
     private readonly IPrivilegedOperationAuditLog _auditLog;
     private CancellationTokenSource? _runCancellation;
@@ -39,6 +40,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         ConnectionDiagnosticUseCase connectionDiagnostic,
         GenerateRecommendationsUseCase generateRecommendations,
         IAdapterDnsConfigurationReader dnsReader,
+        IAdapterAdvancedPropertiesReader advancedPropertiesReader,
         IElevatedOperationLauncher elevatedLauncher,
         IPrivilegedOperationAuditLog auditLog)
     {
@@ -46,6 +48,7 @@ public sealed partial class DashboardViewModel : ObservableObject
         _connectionDiagnostic = connectionDiagnostic;
         _generateRecommendations = generateRecommendations;
         _dnsReader = dnsReader;
+        _advancedPropertiesReader = advancedPropertiesReader;
         _elevatedLauncher = elevatedLauncher;
         _auditLog = auditLog;
     }
@@ -53,6 +56,7 @@ public sealed partial class DashboardViewModel : ObservableObject
     public ObservableCollection<AdapterRowViewModel> Adapters { get; } = new();
     public ObservableCollection<FindingRowViewModel> Findings { get; } = new();
     public ObservableCollection<RecommendationRowViewModel> Recommendations { get; } = new();
+    public ObservableCollection<AdvancedPropertyRowViewModel> AdvancedProperties { get; } = new();
 
     public IReadOnlyList<DiagnosticProfile> AvailableProfiles => DiagnosticProfileCatalog.All;
 
@@ -84,6 +88,9 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool _canRollbackDns;
 
+    [ObservableProperty]
+    private string _advancedPropertiesStatusText = "Selecciona un adaptador para ver sus propiedades avanzadas.";
+
     /// <summary>
     /// Off by default: Windows always exposes several virtual "WAN Miniport" adapters (one
     /// per VPN protocol it supports) plus tunnel pseudo-interfaces (6to4/Teredo/ISATAP),
@@ -103,6 +110,43 @@ public sealed partial class DashboardViewModel : ObservableObject
     }
 
     partial void OnShowVirtualAdaptersChanged(bool value) => ApplyAdapterFilter();
+
+    partial void OnSelectedAdapterChanged(AdapterRowViewModel? value) => _ = LoadAdvancedPropertiesAsync(value);
+
+    /// <summary>
+    /// Module C (brief §6.4): read-only advanced driver/hardware properties (RSS, offloads,
+    /// EEE, etc.) for whichever adapter is selected - fired automatically on selection
+    /// change rather than behind a button, since reading them is cheap and side-effect-free.
+    /// Uses its own status line instead of the shared one so it never clobbers a diagnostic
+    /// or DNS-change message the user is still reading.
+    /// </summary>
+    private async Task LoadAdvancedPropertiesAsync(AdapterRowViewModel? adapter)
+    {
+        AdvancedProperties.Clear();
+
+        if (adapter is null)
+        {
+            AdvancedPropertiesStatusText = "Selecciona un adaptador para ver sus propiedades avanzadas.";
+            return;
+        }
+
+        AdvancedPropertiesStatusText = $"Leyendo propiedades avanzadas de {adapter.Name}...";
+
+        try
+        {
+            var properties = await _advancedPropertiesReader.GetAdvancedPropertiesAsync(adapter.Id, CancellationToken.None);
+            foreach (var property in properties)
+                AdvancedProperties.Add(new AdvancedPropertyRowViewModel(property));
+
+            AdvancedPropertiesStatusText = properties.Count > 0
+                ? $"{properties.Count} propiedad(es) avanzada(s) de {adapter.Name}. Solo lectura - nada aquí se puede cambiar desde esta aplicación."
+                : $"Windows no expone propiedades avanzadas para {adapter.Name} (normal en adaptadores virtuales o algunos controladores).";
+        }
+        catch (Exception ex)
+        {
+            AdvancedPropertiesStatusText = $"No se pudieron leer las propiedades avanzadas: {ex.Message}";
+        }
+    }
 
     private void SetStatus(string text, StatusSeverity severity = StatusSeverity.Info)
     {

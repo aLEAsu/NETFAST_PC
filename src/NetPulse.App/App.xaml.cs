@@ -54,6 +54,7 @@ public partial class App : System.Windows.Application
         // that only exist once the user picks a recommendation, so it cannot itself be a
         // singleton - see DashboardViewModel.ApplyDnsRecommendationAsync).
         services.AddSingleton<IAdapterDnsConfigurationReader, WmiAdapterDnsConfigurationReader>();
+        services.AddSingleton<IAdapterAdvancedPropertiesReader, WmiAdapterAdvancedPropertiesReader>();
         services.AddSingleton<IElevatedOperationLauncher, ElevatedHelperOperationLauncher>();
         services.AddSingleton<IPrivilegedOperationAuditLog>(_ => new SqlitePrivilegedOperationAuditLog(dbPath));
 
