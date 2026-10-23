@@ -10,7 +10,7 @@
 | 4. Recommendation engine | **Implemented** — deterministic rules, risk levels, full descriptor metadata, dashboard panel. No change is simulated or applied yet; see below. |
 | 5. Controlled modifications (privileged agent) | **Implemented, write path unverified** — first real `IOptimizationAction` (`SetAdapterDnsServersAction`), fixed capability allow-list, per-operation elevation via a separate helper process, audit logging. The actual elevated write has never been executed - see `01-architecture.md` §10. |
 | 6. Security & performance validation | **Done for what's measurable here** — security audit, real idle CPU/RAM measurement, diagnostic-pipeline CPU benchmarks, traffic-bound validation, one real regression found and fixed. FPS/game-impact protocol not run (no game/PresentMon available). See `03-phase6-security-performance.md`. |
-| 7. Distribution (installer, signing) | Not started |
+| 7. Distribution (installer, signing) | **Implemented and tested** — real WiX MSI, per-user install (no UAC needed to install/uninstall), verified install/upgrade/uninstall cycle, signing procedure established and exercised with a self-signed test certificate. No CA-issued certificate exists. See `04-phase7-distribution.md`. |
 
 ## Phase 4 scope note: "simulation of changes"
 
@@ -114,7 +114,10 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
   .NET WPF process at startup — expected for a non-trimmed Debug build, but it means the
   resource-usage claims in the original brief are **not yet verified** for this codebase and
   must not be repeated as fact until measured with PresentMon/dotnet-counters per §11.
-- **No installer, no signing.** Phase 7 work is entirely unstarted.
+- **No CA-issued code-signing certificate.** The installer and both executables are
+  signed only with a self-signed test certificate (see `04-phase7-distribution.md` §5) -
+  this proves the signing procedure works, not that any real machine would trust the
+  publisher. A real distribution needs a certificate purchased from a trusted CA.
 - **Test coverage (current).** `NetPulse.UnitTests`: 88 fake/pure-input tests (Domain +
   Application + PrivilegedAgent logic). `NetPulse.IntegrationTests`: 28 tests against the
   **real** adapter stack, ICMP, SQLite, and a real read-only WMI query — no fakes.
@@ -140,14 +143,27 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
 - **The elevated write path is unverified.** See the Phase 5 scope note above. Do not treat
   `SetAdapterDnsServersAction.ApplyAsync`/`RollbackAsync` as proven to work against a real
   adapter until a person has run them once, deliberately, and watched the result.
-- **No deployment step for the elevated helper.** `ElevatedHelperOperationLauncher` expects
-  `NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`; nothing copies it there yet
-  (see `01-architecture.md` §10's "Known gap: helper deployment").
+- **Elevated helper deployment: resolved by the installer.** `ElevatedHelperOperationLauncher`
+  expects `NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`; as of Phase 7,
+  `installer/build.ps1` publishes both and merges them into one payload directory before
+  packaging, so an MSI-installed copy of the app has the helper right next to it. Running
+  either executable directly from its own `bin/` folder during development still won't have
+  this (see `01-architecture.md` §10) - only the installed, or manually merged, output does.
 - **Only one capability exists.** `PrivilegedCapability` has exactly one member
   (`SetAdapterDnsServers`). Adding a second (e.g. an MTU or adapter-property change) means
   adding an enum case, a new `IOptimizationAction`, and a new case in
   `NetPulse.PrivilegedAgent.Host`'s `Run` switch - never a generic "run this with these args"
   escape hatch.
+
+## Phase 7 outcome note
+
+Phase 7 is done and real (see `04-phase7-distribution.md`): a WiX MSI that installs
+per-user with no UAC prompt, a working install/upgrade/uninstall cycle verified by actually
+running it, and a signing procedure exercised with a self-signed test certificate. It also
+closed a previously-open gap: `installer/build.ps1` now deploys
+`NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`, which step 3 below used to
+ask for. What it did **not** produce is a certificate a real end user's Windows would trust -
+that needs a CA purchase, which is the user's own step.
 
 ## Immediate next steps (suggested, not started)
 
@@ -156,12 +172,13 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
 2. Wire a UI entry point (a button, likely next to the recommendations grid) that lets a
    person actually trigger `SetAdapterDnsServersAction` and, critically, perform the **first
    real manual verification** of the elevated write path described in `01-architecture.md` §10.
-3. Add the deployment step (post-build copy, or installer work in Phase 7) that places
-   `NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`.
-4. Once step 2 has been run manually at least once, populate `NetPulse.SafetyTests` with
+3. Once step 2 has been run manually at least once, populate `NetPulse.SafetyTests` with
    whatever that manual run revealed needs automated coverage (rollback correctness,
    capability allow-list enforcement at the host's argument boundary).
-5. Run the brief's FPS/network validation protocol (§11–12) once there is a verified
+4. Run the brief's FPS/network validation protocol (§11–12) once there is a verified
    optimization to measure, rather than against the diagnostics-only build.
-6. Add a second recommendation rule that actually proposes `SetAdapterDnsServersAction`,
+5. Add a second recommendation rule that actually proposes `SetAdapterDnsServersAction`,
    closing the gap between Phase 4 and Phase 5.
+6. Purchase a real code-signing certificate from a trusted CA and re-run
+   `installer\build.ps1 -SigningThumbprint <real-thumbprint>` with it before any real
+   distribution - see `04-phase7-distribution.md` §5.

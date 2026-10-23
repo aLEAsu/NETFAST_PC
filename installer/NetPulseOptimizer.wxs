@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  NetPulse Optimizer installer (WiX Toolset v5).
+
+  Design decision: per-user install scope (Scope="perUser"), not per-machine. This means:
+    - Installing/uninstalling never requires a UAC prompt - the installer itself runs with
+      the user's normal token, consistent with the brief's "normal privileges by default"
+      principle (documentation/01-architecture.md SS7).
+    - Files land under %LocalAppData%\Programs\NetPulseOptimizer, the same convention modern
+      per-user Windows apps (e.g. VS Code) use.
+    - This is also why the installer itself could be verified end-to-end in this project's
+      automated build/test pass: a per-machine (Program Files) install would need an
+      interactive UAC approval the same way NetPulse.PrivilegedAgent.Host's DNS write does
+      (documentation/01-architecture.md SS10), which this project's policy does not let an
+      automated session perform.
+    - This does NOT change anything about SetAdapterDnsServersAction's own elevation model:
+      that action still launches NetPulse.PrivilegedAgent.Host with its own UAC prompt,
+      per operation, regardless of how the app itself was installed.
+
+  UpgradeCode is fixed and must never change across versions - it is what lets a future
+  version's installer detect and replace this one instead of installing side by side.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="NetPulse Optimizer"
+            Manufacturer="NetPulse Optimizer Project"
+            Version="$(var.ProductVersion)"
+            UpgradeCode="36195C2F-390D-4AEC-9F80-F52BC43C680E"
+            Scope="perUser"
+            InstallerVersion="500">
+
+    <SummaryInformation Keywords="Installer" Description="NetPulse Optimizer Setup" Manufacturer="NetPulse Optimizer Project" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of NetPulse Optimizer is already installed. Uninstall it first if you need to downgrade." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="NetPulseOptimizer" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="NetPulse Optimizer" />
+    </StandardDirectory>
+
+    <Feature Id="MainApplication" Title="NetPulse Optimizer" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="ApplicationShortcut" />
+      <ComponentRef Id="ArpRegistration" />
+    </Feature>
+
+    <!--
+      Harvests every file under the published payload directory (set via -d PublishDir on
+      the wix build command line) into INSTALLFOLDER - no need to hand-list ~25 DLLs, and no
+      risk of forgetting one when a dependency is added or removed.
+    -->
+    <ComponentGroup Id="ApplicationFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.PublishDir)\**" />
+    </ComponentGroup>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationShortcut" Guid="7E6F9A3B-1C4D-4E2A-8B6D-2F9C1A5E7D30">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="NetPulse Optimizer"
+                  Description="Diagnose and optimize this PC's network path"
+                  Target="[INSTALLFOLDER]NetPulse.App.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU"
+                        Key="Software\NetPulseOptimizer"
+                        Name="installed"
+                        Type="integer"
+                        Value="1"
+                        KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!--
+      Found by actually testing the install/uninstall cycle (not assumed): WiX 5's automatic
+      "RegisterProduct"/"PublishProduct" sequence for a Scope="perUser" package did NOT create
+      a visible Add/Remove Programs entry in this environment - verified by checking
+      HKCU/HKLM ...\CurrentVersion\Uninstall\{ProductCode} directly after a real install and
+      finding nothing there, even though the product's own self-registration (under
+      HKCU\Software\Microsoft\Installer\Products) was present. Without this, an end user would
+      have no standard UI way to uninstall - they would need to keep the original .msi file
+      and run `msiexec /x` manually. This component writes the standard ARP registry values
+      by hand, which is the well-known workaround for this exact gap.
+    -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="ArpRegistration" Guid="4C8E2F91-6B3A-4D7C-9E1F-3A8B5C2D7E40">
+        <RegistryKey Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Uninstall\NetPulseOptimizer">
+          <RegistryValue Type="string" Name="DisplayName" Value="NetPulse Optimizer" />
+          <RegistryValue Type="string" Name="DisplayVersion" Value="$(var.ProductVersion)" />
+          <RegistryValue Type="string" Name="Publisher" Value="NetPulse Optimizer Project" />
+          <RegistryValue Type="string" Name="UninstallString" Value="MsiExec.exe /X[ProductCode]" KeyPath="yes" />
+          <RegistryValue Type="string" Name="InstallLocation" Value="[INSTALLFOLDER]" />
+          <RegistryValue Type="string" Name="DisplayIcon" Value="[INSTALLFOLDER]NetPulse.App.exe" />
+          <RegistryValue Type="integer" Name="NoModify" Value="1" />
+          <RegistryValue Type="integer" Name="NoRepair" Value="1" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+
+  </Package>
+</Wix>

@@ -12,6 +12,11 @@ obj/
 *.db
 *.db-journal
 
+## Installer build output (reproducible via installer/build.ps1, not checked in)
+installer/publish/
+installer/*.msi
+installer/*.wixpdb
+
 ## OS
 Thumbs.db
 .DS_Store

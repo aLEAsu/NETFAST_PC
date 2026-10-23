@@ -302,12 +302,16 @@ requiring a UAC prompt at all. The correct verification is: build the solution, 
 normal user, trigger the DNS action from a future UI entry point (not yet wired, see §8), and
 personally watch the UAC prompt, the result, and the rollback.
 
-### Known gap: helper deployment
+### Helper deployment: resolved by the Phase 7 installer
 
 `ElevatedHelperOperationLauncher` looks for `NetPulse.PrivilegedAgent.Host.exe` next to the
-running `NetPulse.App.exe` (`AppContext.BaseDirectory`). Nothing currently copies it there -
-today the two projects build to separate `bin/` folders. This is an installer/packaging
-concern (Phase 7), not a code bug, and is tracked in `02-roadmap-and-limitations.md`.
+running `NetPulse.App.exe` (`AppContext.BaseDirectory`). The two projects still build to
+separate `bin/` folders during normal development, but `installer/build.ps1` (Phase 7, see
+`documentation/04-phase7-distribution.md`) publishes both and merges them into one payload
+directory before packaging - an MSI-installed copy of the app has the helper sitting right
+next to it, verified by checking `Test-Path` on the installed helper after a real install.
+Running either executable straight from its own `bin\Debug\...` folder during development
+still won't find the other one there; that is expected, not a regression.
 
 ## 11. How to build and run
 
