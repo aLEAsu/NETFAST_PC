@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\NetPulse.Domain\NetPulse.Domain.csproj" />
     <ProjectReference Include="..\..\src\NetPulse.Application\NetPulse.Application.csproj" />
+    <ProjectReference Include="..\..\src\NetPulse.PrivilegedAgent\NetPulse.PrivilegedAgent.csproj" />
   </ItemGroup>
 
 </Project>

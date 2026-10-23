@@ -5,6 +5,7 @@
     <Project Path="src/NetPulse.Domain/NetPulse.Domain.csproj" />
     <Project Path="src/NetPulse.Infrastructure.Windows/NetPulse.Infrastructure.Windows.csproj" />
     <Project Path="src/NetPulse.Persistence/NetPulse.Persistence.csproj" />
+    <Project Path="src/NetPulse.PrivilegedAgent.Host/NetPulse.PrivilegedAgent.Host.csproj" />
     <Project Path="src/NetPulse.PrivilegedAgent/NetPulse.PrivilegedAgent.csproj" />
   </Folder>
   <Folder Name="/tests/">

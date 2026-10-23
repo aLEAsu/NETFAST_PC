@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <!--
+          Forces Windows to show a UAC prompt whenever this executable is launched, with no
+          way to start it without that prompt. This is the only executable in the solution
+          that requests elevation - the main app (NetPulse.App) and every library it loads
+          run with the user's normal token.
+        -->
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+</assembly>

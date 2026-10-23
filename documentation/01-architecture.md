@@ -1,9 +1,11 @@
 # NetPulse Optimizer — Technical Design
 
-Status: **Phases 3 and 4 (diagnostics + recommendation engine) implemented and building.**
-No optimization is actually applied, no privileged operation exists, and no system/network
-modification exists in this codebase yet - every recommendation is informational only.
-Everything below that is not reflected in `src/` is a proposal for later phases, labeled as such.
+Status: **Phases 3, 4, and 5 (diagnostics + recommendations + privileged agent) implemented
+and building.** Phase 5 adds the first real, applyable optimization
+(`SetAdapterDnsServersAction`) with a genuine elevation boundary - but its write path has
+**never been executed against a real machine** by the automated session that wrote it; see
+§10. Everything below that is not reflected in `src/` is a proposal for later work, labeled
+as such.
 
 ## 1. Executive summary
 
@@ -69,7 +71,8 @@ NetPulse.App  (WPF, MVVM)
          -> NetPulse.Domain   (entities, pure logic, no OS/UI dependency)
     -> NetPulse.Infrastructure.Windows  (implements Application ports via NetworkInterface/Ping)
     -> NetPulse.Persistence   (implements Application ports via SQLite)
-    -> NetPulse.PrivilegedAgent  (contract-only placeholder; no operations yet)
+    -> NetPulse.PrivilegedAgent  (SetAdapterDnsServersAction; orchestrates elevation, never performs it itself)
+         -> NetPulse.PrivilegedAgent.Host  (separate elevated process, launched per-operation; §10)
 ```
 
 Dependency rule: `Domain` depends on nothing. `Application` depends only on `Domain`.
@@ -87,12 +90,14 @@ entries, so it cannot accidentally pull in WPF, SQLite, or Windows-only APIs.
 | `NetPulse.Domain` | `NetworkAdapterInfo`, `LatencySample`, `LatencyStatistics` (pure stats math), `DiagnosticFinding`/`DiagnosticConfidence`, `IOptimizationAction` contract (unused by any implementation yet), `IRecommendationRule`/`RecommendationEngine`/`DefaultRecommendationRules` + 5 rule implementations (§5a) | — |
 | `NetPulse.Application` | Ports (`INetworkAdapterInventoryService`, `ILatencyProbeService`, `IDiagnosticHistoryRepository`), `ConnectionDiagnosticUseCase` (orchestration + classification), `GenerateRecommendationsUseCase` (thin adapter to the Domain engine) | Domain |
 | `NetPulse.Infrastructure.Windows` | `NetworkAdapterInventoryService` (via `System.Net.NetworkInformation.NetworkInterface`, read-only), `IcmpLatencyProbeService` (via `Ping`) | Domain, Application |
-| `NetPulse.Persistence` | `SqliteDiagnosticHistoryRepository` — aggregated run history only, no raw packets | Domain, Application |
-| `NetPulse.PrivilegedAgent` | Placeholder only (see its `README.md`) — no code | Domain, Application |
+| `NetPulse.Persistence` | `SqliteDiagnosticHistoryRepository` (run history), `SqlitePrivilegedOperationAuditLog` (audit trail) — aggregated data only, no raw packets, no credentials | Domain, Application |
+| `NetPulse.PrivilegedAgent` | `SetAdapterDnsServersAction` — the first real `IOptimizationAction`; never writes anything itself, only orchestrates the ports | Domain, Application |
+| `NetPulse.PrivilegedAgent.Host` | Separate elevated console executable; the ONLY code in the solution that calls `SetDNSServerSearchOrder` | Domain only |
 | `NetPulse.App` | WPF dashboard, `DashboardViewModel` (CommunityToolkit.Mvvm), DI wiring in `App.xaml.cs` | all of the above |
-| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics`, `ConnectionDiagnosticUseCase` (incl. classification thresholds), all 5 recommendation rules, `RecommendationEngine`, and `GenerateRecommendationsUseCase` — 46 tests, all fake/pure-input based | Domain, Application |
-| `tests/NetPulse.IntegrationTests` | Real tests against the actual adapter stack, real ICMP, and a real SQLite file — no fakes (see §9a) | Domain, Application, Infrastructure.Windows, Persistence |
-| `tests/NetPulse.SafetyTests`, `PerformanceTests` | Scaffolded, empty. Populate starting Phase 5 once there are privileged operations and optimization rules to exercise. | varies |
+| `tests/NetPulse.UnitTests` | Real tests for `LatencyStatistics`, `ConnectionDiagnosticUseCase`, all 5 recommendation rules, `RecommendationEngine`, `GenerateRecommendationsUseCase`, both privileged-operation validators, and `SetAdapterDnsServersAction` — 81 tests, all fake/pure-input based | Domain, Application, PrivilegedAgent |
+| `tests/NetPulse.IntegrationTests` | Real tests against the actual adapter stack, real ICMP, a real SQLite file, and a real read-only WMI query — no fakes, 28 tests (see §9) | Domain, Application, Infrastructure.Windows, Persistence |
+| `tests/NetPulse.SafetyTests` | Scaffolded, still empty — this is where the elevated write path in §10 should eventually be verified, manually, by a person. | varies |
+| `tests/NetPulse.PerformanceTests` | Scaffolded, empty. | varies |
 
 ## 5. Diagnostic flow (implemented)
 
@@ -171,36 +176,48 @@ MinMs, MedianMs, P95Ms, MaxMs, JitterMs, WindowStart, WindowEnd
 Only aggregated statistics are stored — no raw ICMP payloads, no Wi-Fi passwords, no
 credentials. Database file: `%LOCALAPPDATA%\NetPulseOptimizer\netpulse.db`.
 
-## 7. Security posture (this phase)
+## 7. Security posture
 
-- The process runs with the user's normal (non-elevated) token. Nothing in this build
-  requests or needs elevation.
-- `NetworkAdapterInventoryService` only reads `NetworkInterface`/`IPInterfaceProperties` —
-  no WMI writes, no registry writes, no `NetAdapter` cmdlets.
+- `NetPulse.App`, `NetPulse.Domain`, `NetPulse.Application`, `NetPulse.Infrastructure.Windows`,
+  and `NetPulse.Persistence` all run with the user's normal (non-elevated) token and request
+  no elevation. Only `NetPulse.PrivilegedAgent.Host` ever runs elevated, and only for the
+  single operation it was launched for (§10).
+- `NetworkAdapterInventoryService` and `WmiAdapterDnsConfigurationReader` are read-only - no
+  WMI writes, no registry writes, no `NetAdapter` cmdlets, anywhere in the unelevated app's
+  dependency graph.
 - `IcmpLatencyProbeService` only sends ICMP echo requests through the BCL `Ping` class — no
   raw sockets, no packet crafting.
 - There is no code path anywhere in this solution that accepts a string and executes it as a
-  shell command. `IOptimizationAction` (Domain) is designed specifically to prevent that
-  pattern in future phases — the capability is a compiled, named class, not an arbitrary
-  command.
-- `NetPulse.PrivilegedAgent` contains no operations. Its eventual allow-list design is
-  documented in its `README.md` and is deferred until a concrete optimization needs it.
+  shell command. The one process boundary that does launch another process
+  (`ElevatedHelperOperationLauncher`) builds its child process's arguments from individually
+  validated, typed values (`AdapterIdValidator`, `DnsServerAddressValidator`), never by
+  concatenating free-form text, and the receiving end (`NetPulse.PrivilegedAgent.Host`)
+  re-validates every argument again rather than trusting the caller.
+- The capability surface is fixed at compile time (`PrivilegedCapability` enum, currently one
+  member). There is no plugin loader, no way to register a new capability from configuration
+  or the UI, and no way to pass an arbitrary executable name or argument list to the elevated
+  helper.
+- Every privileged-operation attempt - Check, Capture, Apply, Verify, Rollback, successful or
+  not - is written to the local `PrivilegedOperationAudit` SQLite table via
+  `IPrivilegedOperationAuditLog`, never transmitted anywhere.
 
 ## 8. What is explicitly deferred (not implemented, not stubbed-and-hidden)
 
-- Any registry, TCP/IP, DNS, or adapter *write*.
+- A second or third `IOptimizationAction` beyond the one DNS action (Phase 5 shipped exactly
+  one, deliberately, to prove the pattern rather than rushing several).
+- Wiring a recommendation rule (Phase 4) to actually *offer* running `SetAdapterDnsServersAction`
+  from the dashboard - today the two phases are not cross-linked; see §10.
 - Bufferbloat active-load testing.
-- The rule-based recommendation/optimization engine.
-- The privileged agent's actual capabilities.
 - Per-process bandwidth accounting.
 - Game-protection mode.
-- Installer/signing pipeline.
+- Installer/signing pipeline (which is also what would deploy `NetPulse.PrivilegedAgent.Host.exe`
+  alongside the main app - see §10's known gap on that).
 - WinUI 3 (pending Visual Studio + Windows App SDK workload availability — see §3).
 
 Each of these needs its own design pass before code; none should be bolted on as a quick
 addition to the current prototype.
 
-## 9a. Integration tests against the real adapter stack
+## 9. Integration tests against the real adapter stack
 
 `tests/NetPulse.IntegrationTests` deliberately contains **no fakes**. It exercises:
 
@@ -209,17 +226,90 @@ addition to the current prototype.
 - `IcmpLatencyProbeService` with real ICMP traffic: `127.0.0.1` for a guaranteed reply, and
   `203.0.113.1` (RFC 5737 TEST-NET-3, reserved/non-routable) for a guaranteed non-reply —
   chosen specifically so the suite never depends on a third-party host being reachable.
-- `SqliteDiagnosticHistoryRepository` against a real temporary `.db` file (round trip,
-  filtering, ordering, concurrent writes), cleaned up in each test class's `Dispose()`.
-- `ConnectionDiagnosticUseCase` wired end-to-end with the three services above — the same
-  wiring `App.xaml.cs` uses, minus WPF.
+- `SqliteDiagnosticHistoryRepository` and `SqlitePrivilegedOperationAuditLog` against real
+  temporary `.db` files (round trip, filtering, ordering, concurrent writes), cleaned up in
+  each test class's `Dispose()`.
+- `ConnectionDiagnosticUseCase` wired end-to-end with the three diagnostic services — the
+  same wiring `App.xaml.cs` uses, minus WPF.
+- `WmiAdapterDnsConfigurationReader` — a real, read-only WMI query against this machine's
+  adapters (see §10 for why there is no equivalent test of the *write* path).
 
 These tests found a real defect: the loopback adapter reports MTU as `-1` instead of a sane
 value or an exception. `NetworkAdapterInventoryService.SafeMtu` now normalizes any
 non-positive MTU to `0`. This is the kind of bug fake-based unit tests cannot surface by
 construction — it is the reason this suite exists.
 
-## 9. How to build and run
+## 10. Privileged agent and elevation boundary (Phase 5)
+
+### Decision: per-operation elevation, no persistent service
+
+The brief (§9) asks for a decision between point-in-time elevation and an isolated service,
+and says not to build a permanent privileged service without a demonstrated need. This build
+chooses **per-operation elevation**: `NetPulse.PrivilegedAgent.Host` is a separate, minimal
+console executable that:
+
+- Is launched fresh for exactly one operation and exits immediately after.
+- Requests elevation via its own manifest (`requestedExecutionLevel level="requireAdministrator"`),
+  so Windows shows a UAC prompt the user must personally approve - there is no way to suppress
+  or pre-answer it from this codebase.
+- Has no network listener, no named pipe, no IPC surface that stays open between runs. It reads
+  four command-line arguments, does one validated thing, writes one JSON result file, and exits.
+- Depends on nothing but `NetPulse.Domain` (for the same validators the caller already ran) and
+  `System.Management`. It does not reference `NetPulse.Application`, `NetPulse.Infrastructure.Windows`,
+  or `NetPulse.Persistence` - the smaller its dependency graph, the smaller its attack surface.
+
+No part of this design keeps an elevated process running in the background. There is no
+persistent privileged service anywhere in this solution.
+
+### The flow, end to end
+
+```
+NetPulse.App (unelevated)
+  -> SetAdapterDnsServersAction.ApplyAsync
+       -> IElevatedOperationLauncher.ExecuteAsync(PrivilegedOperationRequest)
+            -> ElevatedHelperOperationLauncher (Infrastructure.Windows, unelevated)
+                 - re-validates adapterId and DNS servers
+                 - builds a result-file path under %LOCALAPPDATA%\NetPulseOptimizer\elevated-results\
+                 - Process.Start(NetPulse.PrivilegedAgent.Host.exe, Verb="runas", <4 validated args>)
+                   === UAC prompt; the user approves or declines ===
+                 -> NetPulse.PrivilegedAgent.Host (elevated, if approved)
+                      - re-validates every argument again, independently
+                      - calls Win32_NetworkAdapterConfiguration.SetDNSServerSearchOrder
+                      - writes {"success":.., "output":.., "error":..} to the result file, exits
+            <- reads the result file, deletes it, returns PrivilegedOperationResult
+       <- logs the attempt to PrivilegedOperationAudit (Persistence), maps to OptimizationResult
+```
+
+`CaptureAsync` and `VerifyAsync` only ever call `IAdapterDnsConfigurationReader`
+(`WmiAdapterDnsConfigurationReader`), which is read-only and runs unelevated - capturing the
+state to roll back to, and checking whether a change took effect, never themselves require
+elevation.
+
+### What has and has not been verified
+
+| Step | Verified how |
+|---|---|
+| `AdapterIdValidator`, `DnsServerAddressValidator` | Real unit tests, many adversarial inputs (SQL-injection-shaped strings, shell-metacharacter-shaped strings, hostnames, out-of-range IPs) |
+| `SetAdapterDnsServersAction` (all 5 contract methods) | Real unit tests against fakes for every dependency |
+| `WmiAdapterDnsConfigurationReader` (read) | Real integration test against this machine's real adapter via WMI - read-only |
+| `SqlitePrivilegedOperationAuditLog` | Real integration test, real temp SQLite file |
+| `ElevatedHelperOperationLauncher` launching the real host with real `runas` elevation | **Not run.** Doing so would show a real UAC prompt and, if approved, make a real DNS change on this machine. The coding agent that built this is not permitted to perform that action even with standing authorization - only a person, deliberately, running the finished application, can approve that UAC prompt. |
+| `NetPulse.PrivilegedAgent.Host`'s actual `SetDNSServerSearchOrder` call | **Not run**, for the same reason. |
+
+This is not a gap to "get around" later with a different kind of test - an elevated, real
+system-modifying action verified by an unattended coding session defeats the purpose of
+requiring a UAC prompt at all. The correct verification is: build the solution, run it as a
+normal user, trigger the DNS action from a future UI entry point (not yet wired, see §8), and
+personally watch the UAC prompt, the result, and the rollback.
+
+### Known gap: helper deployment
+
+`ElevatedHelperOperationLauncher` looks for `NetPulse.PrivilegedAgent.Host.exe` next to the
+running `NetPulse.App.exe` (`AppContext.BaseDirectory`). Nothing currently copies it there -
+today the two projects build to separate `bin/` folders. This is an installer/packaging
+concern (Phase 7), not a code bug, and is tracked in `02-roadmap-and-limitations.md`.
+
+## 11. How to build and run
 
 ```bash
 dotnet build NetPulseOptimizer.slnx
@@ -228,6 +318,7 @@ dotnet test tests/NetPulse.IntegrationTests/NetPulse.IntegrationTests.csproj
 dotnet run --project src/NetPulse.App/NetPulse.App.csproj
 ```
 
-Verified in this environment: solution builds with 0 errors/0 warnings, 46/46 unit tests pass,
-21/21 integration tests pass against the real adapter stack/ICMP/SQLite, and the app launches
-and reaches the dashboard (`MainWindowTitle` confirmed via a running process check).
+Verified in this environment: solution builds with 0 errors/0 warnings, 81/81 unit tests pass,
+28/28 integration tests pass against the real adapter stack/ICMP/SQLite/WMI (read-only), and
+the app launches and reaches the dashboard (`MainWindowTitle` confirmed via a running process
+check). Not verified: the elevated write path described in §10.
