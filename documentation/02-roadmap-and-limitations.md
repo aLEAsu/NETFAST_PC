@@ -40,26 +40,32 @@ See `05-code-audit-and-recommendations.md` for the full audit; summary of what c
   WMI/network-enumeration failure would have crashed the whole app); and a
   `DispatcherUnhandledException` backstop was missing entirely. Both fixed - see
   `05-code-audit-and-recommendations.md`.
-- **Still not implemented**, by deliberate scope decision (see
-  `06-continuation-brief.md` for the detailed next-session plan): bufferbloat active-load
-  testing (Module E), per-process bandwidth accounting (Module F), pktmon/ETW advanced
-  diagnostics (Module G), advanced NIC properties (RSS/offloads/etc., part of Module C),
-  WinUI 3 migration, and a CA-issued signing certificate.
+- **Modules C, E, F, and G are now all implemented** - see `06-continuation-brief.md` §2 for
+  what each actually shipped (each has a deliberate, disclosed scope decision: Module F is
+  connection visibility rather than fabricated per-process bytes, Module G is bounded
+  counters-only rather than full packet capture). The Domain-layer diagnostic/recommendation
+  text is also now fully in Spanish (previously deferred, then completed once it turned out
+  far fewer tests depended on its exact wording than expected).
+- **Still not implemented**, both blocked by something outside an automated session's
+  control rather than by remaining effort: WinUI 3 migration (needs Visual Studio/the
+  Windows App SDK workload, not available in this environment) and a CA-issued signing
+  certificate (needs a purchase and identity verification by whoever owns this project).
 
 ## Phase 4 scope note: "simulation of changes"
 
 The brief's Phase 4 (§16) asks for a recommendation engine plus "simulación de cambios"
 (change simulation). This build's rules never propose or preview an actual system change -
 every rule either (a) recommends collecting more evidence, (b) recommends an external
-diagnostic step (checking the router, running a load test that does not exist yet), or
-(c) explicitly recommends no change. Each still carries the full
-`OptimizationDescriptor` contract (risk, preconditions, verification method, success/failure
-criteria, rollback method, limitations) so the UI and the user see everything a real,
-Phase-5 `IOptimizationAction` would have to declare - that metadata-level preview **is** the
-"simulation" this phase ships. No rule here can execute anything: `RollbackMethod` on every
-current rule reads "Not applicable" because nothing is ever applied. A rule that proposes an
-actual Windows setting change is deliberately deferred to Phase 5, once there is a reviewed
-`IOptimizationAction` implementation behind it.
+diagnostic step (checking the router, running the bufferbloat load test - now real, see
+Module E in `06-continuation-brief.md`), or (c) explicitly recommends no change. Each still
+carries the full `OptimizationDescriptor` contract (risk, preconditions, verification
+method, success/failure criteria, rollback method, limitations) so the UI and the user see
+everything a real, Phase-5 `IOptimizationAction` would have to declare - that metadata-level
+preview **is** the "simulation" this phase ships. No rule here can execute anything:
+`RollbackMethod` on every current rule reads "No aplica" (translated from the original "Not
+applicable") because nothing is ever applied. A rule that proposes an actual Windows setting
+change is deliberately deferred to Phase 5, once there is a reviewed `IOptimizationAction`
+implementation behind it.
 
 ## Phase 5 verification pass (post-implementation review)
 
@@ -179,16 +185,21 @@ Every piece of Phase 5 compiles, is wired together correctly, and is covered by 
   executed `SetAdapterDnsServersAction.ApplyAsync`/`RollbackAsync` against a real adapter.
   Unlike earlier phases, a person now reaches that path with one click plus one UAC approval
   from the running app - there is no longer a missing wiring step between them and it.
-- **Elevated helper deployment: resolved by the installer.** `ElevatedHelperOperationLauncher`
-  expects `NetPulse.PrivilegedAgent.Host.exe` next to `NetPulse.App.exe`; as of Phase 7,
-  `installer/build.ps1` publishes both and merges them into one payload directory before
-  packaging, so an MSI-installed copy of the app has the helper right next to it. Running
-  either executable directly from its own `bin/` folder during development still won't have
-  this (see `01-architecture.md` §10) - only the installed, or manually merged, output does.
-- **Only one capability exists.** `PrivilegedCapability` has exactly one member
-  (`SetAdapterDnsServers`). Adding a second (e.g. an MTU or adapter-property change) means
-  adding an enum case, a new `IOptimizationAction`, and a new case in
-  `NetPulse.PrivilegedAgent.Host`'s `Run` switch - never a generic "run this with these args"
+- **Elevated helper deployment: resolved both by the installer and by the dev-loop build.**
+  `ElevatedHelperOperationLauncher` expects `NetPulse.PrivilegedAgent.Host.exe` next to
+  `NetPulse.App.exe`. As of Phase 7, `installer/build.ps1` publishes both and merges them
+  into one payload directory before packaging. This note used to say that running
+  `NetPulse.App` directly from its own `bin/` folder during development would NOT have the
+  helper next to it - that was a real gap, caught by the user while manually verifying the
+  pktmon capture feature (it failed with "Elevated helper not found"). Fixed:
+  `NetPulse.App.csproj` now has a `ReferenceOutputAssembly="false"` reference to
+  `NetPulse.PrivilegedAgent.Host` plus an `AfterTargets="Build"` copy target, so a plain
+  `dotnet build`/`dotnet run` of `NetPulse.App` alone now also produces a working
+  `NetPulse.PrivilegedAgent.Host.exe` next to it.
+- **Two capabilities exist.** `PrivilegedCapability` has `SetAdapterDnsServers` and
+  `CapturePacketCounters` (Module G). Adding a third means adding an enum case, updating
+  both `ElevatedHelperOperationLauncher`'s and `NetPulse.PrivilegedAgent.Host`'s per-
+  capability validation/dispatch switches - never a generic "run this with these args"
   escape hatch.
 
 ## Phase 7 outcome note
@@ -201,20 +212,26 @@ closed a previously-open gap: `installer/build.ps1` now deploys
 ask for. What it did **not** produce is a certificate a real end user's Windows would trust -
 that needs a CA purchase, which is the user's own step.
 
-## Immediate next steps (suggested, not started)
+## Immediate next steps (status as of the Modules C/E/F/G + localization pass)
 
-1. Add a TCP-connect and DNS-resolution probe alongside ICMP, so loss classification can
-   distinguish "no ICMP reply" from "no application-level connectivity."
-2. Wire a UI entry point (a button, likely next to the recommendations grid) that lets a
-   person actually trigger `SetAdapterDnsServersAction` and, critically, perform the **first
-   real manual verification** of the elevated write path described in `01-architecture.md` §10.
-3. Once step 2 has been run manually at least once, populate `NetPulse.SafetyTests` with
-   whatever that manual run revealed needs automated coverage (rollback correctness,
-   capability allow-list enforcement at the host's argument boundary).
-4. Run the brief's FPS/network validation protocol (§11–12) once there is a verified
-   optimization to measure, rather than against the diagnostics-only build.
-5. Add a second recommendation rule that actually proposes `SetAdapterDnsServersAction`,
-   closing the gap between Phase 4 and Phase 5.
+1. ~~Add a TCP-connect and DNS-resolution probe alongside ICMP...~~ **Done.**
+2. ~~Wire a UI entry point... perform the first real manual verification of the elevated
+   write path.~~ **Done** - the user ran it manually (DNS apply/verify/rollback, UAC
+   approved and declined both tested), and separately ran the Module G pktmon capture
+   manually too (found and helped fix two real bugs: the missing elevated-helper copy step,
+   and mojibake from a wrong console encoding).
+3. `NetPulse.SafetyTests` still only covers the recovery lifecycle against fakes - the
+   manual runs didn't surface a gap serious enough to warrant new automated coverage beyond
+   what already exists, but this is worth re-checking after Module E's first real manual run.
+4. Run the brief's FPS/network validation protocol (§11-12) once there is a verified
+   optimization to measure, rather than against the diagnostics-only build. **Still not
+   done** - no game/PresentMon available in this environment.
+5. ~~Add a second recommendation rule that actually proposes SetAdapterDnsServersAction.~~
+   **Done** (`SlowDnsResolutionRule`).
 6. Purchase a real code-signing certificate from a trusted CA and re-run
    `installer\build.ps1 -SigningThumbprint <real-thumbprint>` with it before any real
-   distribution - see `04-phase7-distribution.md` §5.
+   distribution - see `04-phase7-distribution.md` §5. **Still not done** - requires a
+   purchase and identity verification by whoever owns this project, not an automated step.
+7. **New:** Module E (bufferbloat) is built and tested against a local loopback server, but
+   its first real run against the actual internet (speed.cloudflare.com) has not yet been
+   manually triggered by a person - same discipline as steps 2 and the pktmon capture above.

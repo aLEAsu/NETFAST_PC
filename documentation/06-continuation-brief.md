@@ -26,15 +26,31 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
   Bufferbloat / Captura avanzada) instead of one long vertically-stacked screen - the
   original single-screen layout was reported as cluttered/unintuitive, and adding Modules
   E/F/G to it would have made that materially worse.
+- **The elevated write path has now been manually, really verified by a person - twice.**
+  The DNS apply/verify/rollback flow was run for real (UAC approved and declined both
+  tested). The Module G pktmon capture was also run for real, which caught two genuine bugs
+  that no automated session's testing had found: (1) `NetPulse.App.csproj` never copied
+  `NetPulse.PrivilegedAgent.Host.exe` into its own output folder for a plain `dotnet build`/
+  `dotnet run` (only the installer's separate publish step did) - every privileged action
+  failed with "Elevated helper not found" when run from source; fixed with a
+  `ReferenceOutputAssembly="false"` project reference plus an `AfterTargets="Build"` copy
+  target. (2) pktmon's captured text came back as mojibake (`Direcci├│n` instead of
+  `Dirección`) because `Process.StandardOutput` was read with the console's OEM codepage
+  instead of UTF-8 (pktmon's actual output encoding); fixed by setting
+  `StandardOutputEncoding`/`StandardErrorEncoding` explicitly. **Module E (bufferbloat) has
+  not yet had its first real run against the actual internet** - it is built and tested
+  against a local loopback server only, per the same "only a human triggers this" discipline.
+- **Full Spanish localization is now complete**, including the Domain layer (diagnostic
+  finding text and all 6 recommendation rules) - see §7's note below for what that involved.
 - Diagnostics (ICMP + TCP confirmation + DNS resolution timing) are real and tested.
 - The recommendation engine (6 rules) is real and tested. Exactly one rule
   (`SlowDnsResolutionRule`) has an applyable action behind it.
 - `SetAdapterDnsServersAction` (the one real, reversible optimization this build has) is
-  fully implemented, fully unit/safety-tested against fakes, and **reachable from the
-  running app's UI** (select an adapter, run a diagnostic, click "Apply suggested DNS
-  servers" if the rule fires). **Its actual write has never been executed against a real
-  adapter by any automated session.** That is not a historical footnote - it is the single
-  most important unverified fact about this codebase. See §4 before changing that.
+  fully implemented, fully unit/safety-tested against fakes, **reachable from the running
+  app's UI**, and - per the bullet above - **has now actually been run for real by a
+  person**, UAC approved, verified, and rolled back successfully. No automated session has
+  ever executed it, and none should (see §3's constraint #1) - but it is no longer an
+  unverified fact about this codebase, only a continuously-true rule about who may trigger it.
 - A real WiX MSI installer exists, installs per-user (no admin needed), and the full
   install/upgrade/uninstall cycle has been tested for real. Signing works mechanically with
   a self-signed test certificate; there is no certificate any real machine would trust.
@@ -129,6 +145,14 @@ These held for every phase of this project so far and must keep holding:
    when the code moved - see `05-code-audit-and-recommendations.md` §3 recommendation 4.
 
 ## 4. Priority 1: get a human to run the DNS action, once, for real
+
+**Status: done.** The user ran this manually - UAC appeared and was approved, the change
+applied and verified, then rolled back; declining the UAC prompt was also tested and
+reported cleanly. The only follow-up this surfaced was a UX issue (the post-apply/verify
+status message was unclear about whether the change took effect), fixed by rewriting it to
+spell out before/requested/now explicitly. The steps below are kept for reference - they are
+also exactly what Module G's (pktmon) and Module E's (bufferbloat) own first real,
+human-triggered runs should follow.
 
 This is not a coding task. Before adding anything else to `PrivilegedAgent`, someone needs
 to:
