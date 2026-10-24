@@ -50,6 +50,38 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Foreground" Value="#E8E8EA"/>
         </Style>
+        <!-- One tab per diagnostic area instead of stacking every grid vertically - the
+             earlier single-screen layout was reported as cluttered/unintuitive, and this
+             change was about to add three more sections (per-process network, bufferbloat,
+             packet capture) that would have made that worse, not better. -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="#1E1F24"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#E8E8EA"/>
+            <Setter Property="Background" Value="#26272E"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style x:Key="SectionNoteStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="#9A9AA2"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style x:Key="MonospaceOutputStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Background" Value="#16171B"/>
+            <Setter Property="Foreground" Value="#D6D6DA"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -57,15 +89,12 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="0.7*"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="0,0,0,12">
             <TextBlock Text="NetPulse Optimizer" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Diagnóstico + recomendaciones. La mayoría de las recomendaciones son solo informativas. Una (servidores DNS) se puede aplicar abajo - siempre pide confirmación primero y requiere aprobar un control de UAC de Windows antes de cambiar algo."
+            <TextBlock Text="Diagnóstico + recomendaciones. La mayoría de las recomendaciones son solo informativas. Una (servidores DNS) se puede aplicar en la pestaña Diagnóstico - siempre pide confirmación primero y requiere aprobar un control de UAC de Windows antes de cambiar algo."
                        FontSize="12" Foreground="#9A9AA2" Margin="0,2,0,0" TextWrapping="Wrap"/>
         </StackPanel>
 
@@ -101,82 +130,214 @@
             </StackPanel>
         </Border>
 
-        <GroupBox Grid.Row="2" Header="Adaptadores de red (inventario de solo lectura - selecciona uno para poder aplicar una recomendación de DNS abajo; los adaptadores virtuales de Windows están ocultos por defecto)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" SelectionMode="Single" SelectionUnit="FullRow">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Nombre" Binding="{Binding Name}" Width="1.3*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Descripción" Binding="{Binding Description}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Tipo" Binding="{Binding Kind}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Estado" Binding="{Binding Status}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Velocidad" Binding="{Binding Speed}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="IPv4" Binding="{Binding IPv4}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Puerta de enlace" Binding="{Binding Gateway}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="DNS" Binding="{Binding Dns}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="MTU" Binding="{Binding Mtu}" Width="0.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </GroupBox>
+        <TabControl Grid.Row="2">
+            <TabItem Header="Adaptadores">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="0.7*"/>
+                    </Grid.RowDefinitions>
 
-        <GroupBox Grid.Row="3" Header="Propiedades avanzadas del adaptador seleccionado (RSS, descargas de hardware, EEE, etc. - solo lectura, informativo, nada se puede cambiar aquí)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <DataGrid Grid.Row="0" ItemsSource="{Binding AdvancedProperties}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Propiedad" Binding="{Binding DisplayName}" Width="1.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Valor" Binding="{Binding DisplayValue}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Clave de registro" Binding="{Binding Keyword}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Valor crudo" Binding="{Binding RawValue}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-                <TextBlock Grid.Row="1" Text="{Binding AdvancedPropertiesStatusText}" Margin="0,6,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap"/>
-            </Grid>
-        </GroupBox>
+                    <GroupBox Grid.Row="0" Header="Adaptadores de red (inventario de solo lectura - selecciona uno para ver sus propiedades avanzadas abajo y para poder aplicar una recomendación de DNS en la pestaña Diagnóstico; los adaptadores virtuales de Windows están ocultos por defecto)" Margin="0,0,0,12" Foreground="#E8E8EA">
+                        <DataGrid ItemsSource="{Binding Adapters}" SelectedItem="{Binding SelectedAdapter}" SelectionMode="Single" SelectionUnit="FullRow">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Nombre" Binding="{Binding Name}" Width="1.3*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Descripción" Binding="{Binding Description}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Tipo" Binding="{Binding Kind}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Estado" Binding="{Binding Status}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Velocidad" Binding="{Binding Speed}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="IPv4" Binding="{Binding IPv4}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Puerta de enlace" Binding="{Binding Gateway}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="DNS" Binding="{Binding Dns}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="MTU" Binding="{Binding Mtu}" Width="0.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
 
-        <GroupBox Grid.Row="4" Header="Resultados del diagnóstico (etiquetados por nivel de confianza; no son garantía de la causa)" Margin="0,0,0,12" Foreground="#E8E8EA">
-            <DataGrid ItemsSource="{Binding Findings}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Confianza" Binding="{Binding Confidence}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Resumen" Binding="{Binding Summary}" Width="2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Mediana" Binding="{Binding Median}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="P95" Binding="{Binding P95}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Jitter" Binding="{Binding Jitter}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Pérdida" Binding="{Binding Loss}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="TCP" Binding="{Binding TcpCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="DNS" Binding="{Binding DnsCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                </DataGrid.Columns>
-            </DataGrid>
-        </GroupBox>
+                    <GroupBox Grid.Row="1" Header="Propiedades avanzadas del adaptador seleccionado (RSS, descargas de hardware, EEE, etc. - solo lectura, informativo, nada se puede cambiar aquí)" Foreground="#E8E8EA">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid Grid.Row="0" ItemsSource="{Binding AdvancedProperties}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Propiedad" Binding="{Binding DisplayName}" Width="1.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Valor" Binding="{Binding DisplayValue}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Clave de registro" Binding="{Binding Keyword}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Valor crudo" Binding="{Binding RawValue}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <TextBlock Grid.Row="1" Text="{Binding AdvancedPropertiesStatusText}" Margin="0,6,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap"/>
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
 
-        <GroupBox Grid.Row="5" Header="Recomendaciones - nada se aplica automáticamente; solo la de DNS se puede aplicar, y solo después de confirmar y aprobar un control de UAC" Foreground="#E8E8EA">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <DataGrid Grid.Row="0" ItemsSource="{Binding Recommendations}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Título" Binding="{Binding Title}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Riesgo" Binding="{Binding Risk}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Confianza" Binding="{Binding BasisConfidence}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Por qué se activó" Binding="{Binding Explanation}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Cómo verificarlo" Binding="{Binding NextStep}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                        <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="Aplicar servidores DNS sugeridos (1.1.1.1, 8.8.8.8)" Command="{Binding ApplyDnsRecommendationCommand}" Padding="12,4"/>
-                    <Button Content="Revertir cambio de DNS" Command="{Binding RollbackDnsCommand}" Margin="8,0,0,0" Padding="12,4"/>
-                </StackPanel>
-            </Grid>
-        </GroupBox>
+            <TabItem Header="Diagnóstico">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="6" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic"
+                    <GroupBox Grid.Row="0" Header="Resultados del diagnóstico (etiquetados por nivel de confianza; no son garantía de la causa)" Margin="0,0,0,12" Foreground="#E8E8EA">
+                        <DataGrid ItemsSource="{Binding Findings}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Confianza" Binding="{Binding Confidence}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Resumen" Binding="{Binding Summary}" Width="2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Mediana" Binding="{Binding Median}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="P95" Binding="{Binding P95}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Jitter" Binding="{Binding Jitter}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Pérdida" Binding="{Binding Loss}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="TCP" Binding="{Binding TcpCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="DNS" Binding="{Binding DnsCheck}" Width="1.2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1" Header="Recomendaciones - nada se aplica automáticamente; solo la de DNS se puede aplicar, y solo después de confirmar y aprobar un control de UAC" Foreground="#E8E8EA">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid Grid.Row="0" ItemsSource="{Binding Recommendations}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Objetivo" Binding="{Binding Target}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Título" Binding="{Binding Title}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Riesgo" Binding="{Binding Risk}" Width="0.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Confianza" Binding="{Binding BasisConfidence}" Width="0.7*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Por qué se activó" Binding="{Binding Explanation}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Cómo verificarlo" Binding="{Binding NextStep}" Width="1.6*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Limitaciones" Binding="{Binding Limitations}" Width="1.4*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Content="Aplicar servidores DNS sugeridos (1.1.1.1, 8.8.8.8)" Command="{Binding ApplyDnsRecommendationCommand}" Padding="12,4"/>
+                                <Button Content="Revertir cambio de DNS" Command="{Binding RollbackDnsCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Red por proceso">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="0.6*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource SectionNoteStyle}"
+                               Text="Muestra qué proceso tiene cada conexión TCP activa (igual que netstat -ano), y la velocidad real actual de cada interfaz. No muestra bytes por proceso: Windows no expone esa cifra sin herramientas de más bajo nivel (ETW/administrador), y esta aplicación no inventa una estimación para no fabricar números."/>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="Actualizar" Command="{Binding RefreshProcessConnectionsCommand}" Padding="12,4"/>
+                    </StackPanel>
+
+                    <GroupBox Grid.Row="2" Header="Conexiones TCP activas por proceso" Margin="0,0,0,12" Foreground="#E8E8EA">
+                        <DataGrid ItemsSource="{Binding ProcessConnections}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="PID" Binding="{Binding ProcessId}" Width="0.5*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Proceso" Binding="{Binding ProcessName}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Local" Binding="{Binding LocalEndpoint}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Remoto" Binding="{Binding RemoteEndpoint}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                <DataGridTextColumn Header="Estado" Binding="{Binding State}" Width="0.8*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="3" Header="Velocidad actual por interfaz (agregado real medido por Windows - no atribuido a ningún proceso)" Foreground="#E8E8EA">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid Grid.Row="0" ItemsSource="{Binding AdapterThroughput}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Interfaz" Binding="{Binding InterfaceName}" Width="2*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Subida" Binding="{Binding BytesSentPerSecond}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                    <DataGridTextColumn Header="Bajada" Binding="{Binding BytesReceivedPerSecond}" Width="1*" ElementStyle="{StaticResource WrappingCellStyle}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <TextBlock Grid.Row="1" Text="{Binding ProcessConnectionsStatusText}" Margin="0,6,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap"/>
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Bufferbloat">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource SectionNoteStyle}"
+                               Text="Mide la latencia en reposo y luego la latencia mientras se genera carga real de subida o bajada contra el servidor público de pruebas de velocidad de Cloudflare (speed.cloudflare.com) - un tercero fuera del control de esta aplicación. Esta es la única prueba de esta aplicación que necesita contactar internet específicamente para generar tráfico, y solo se ejecuta cuando tú lo pides explícitamente aquí; nunca se combina con &quot;Ejecutar diagnóstico&quot;. Puedes cancelarla, aunque la cancelación puede tardar hasta el final de la petición en curso."/>
+
+                    <Border Grid.Row="1" Background="#26272E" Padding="12" CornerRadius="4" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Objetivo a medir (ping):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBox Text="{Binding BufferbloatTargetText, UpdateSourceTrigger=PropertyChanged}" Width="140" VerticalAlignment="Center"/>
+
+                            <TextBlock Text="Dirección:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                            <ComboBox ItemsSource="{Binding BufferbloatDirections}" SelectedItem="{Binding SelectedBufferbloatDirection}" Width="140" VerticalAlignment="Center"/>
+
+                            <TextBlock Text="Duración de carga:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                            <ComboBox ItemsSource="{Binding BufferbloatDurationChoices}" SelectedItem="{Binding SelectedBufferbloatDurationSeconds}" Width="100" VerticalAlignment="Center"/>
+
+                            <Button Content="Ejecutar prueba de bufferbloat" Command="{Binding RunBufferbloatTestCommand}" Margin="16,0,0,0" Padding="12,4"/>
+                            <Button Content="Cancelar" Command="{Binding CancelBufferbloatTestCommand}" Margin="8,0,0,0" Padding="12,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <GroupBox Grid.Row="2" Header="Resultado" Foreground="#E8E8EA">
+                        <TextBlock Text="{Binding BufferbloatStatusText}" TextWrapping="Wrap" Margin="12" VerticalAlignment="Top"/>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Captura avanzada (pktmon)">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Style="{StaticResource SectionNoteStyle}"
+                               Text="Captura contadores de paquetes de Windows (pktmon) durante un tiempo acotado - NUNCA contenido ni carga útil de paquetes, solo conteos agregados (paquetes, descartes) por adaptador. Requiere aprobar un control de UAC igual que el cambio de DNS: esta aplicación nunca puede aprobarlo por ti. El controlador pktmon se descarga automáticamente al terminar - no queda nada ejecutándose en segundo plano."/>
+
+                    <Border Grid.Row="1" Background="#26272E" Padding="12" CornerRadius="4" Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Duración de la captura:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox ItemsSource="{Binding PacketCaptureDurationChoices}" SelectedItem="{Binding SelectedPacketCaptureDurationSeconds}" Width="100" VerticalAlignment="Center"/>
+                            <Button Content="Capturar contadores (requiere UAC)" Command="{Binding RunPacketCaptureCommand}" Margin="16,0,0,0" Padding="12,4"/>
+                        </StackPanel>
+                    </Border>
+
+                    <GroupBox Grid.Row="2" Header="Salida cruda de pktmon (sin procesar - para no arriesgar interpretar mal un número)" Foreground="#E8E8EA">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBox Grid.Row="0" Style="{StaticResource MonospaceOutputStyle}" Text="{Binding PacketCaptureRawOutputText, Mode=OneWay}"/>
+                            <TextBlock Grid.Row="1" Text="{Binding PacketCaptureStatusText}" Margin="0,6,0,0" FontStyle="Italic" Foreground="#9A9AA2" TextWrapping="Wrap"/>
+                        </Grid>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Margin="0,12,0,0" FontStyle="Italic"
                     Foreground="{Binding StatusSeverity, Converter={StaticResource StatusSeverityConverter}}"
                     TextWrapping="Wrap"/>
     </Grid>

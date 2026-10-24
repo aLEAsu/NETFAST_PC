@@ -11,4 +11,11 @@ public enum PrivilegedCapability
 {
     /// <summary>Overwrite the DNS server search order configured on one adapter.</summary>
     SetAdapterDnsServers,
+
+    /// <summary>
+    /// Run a short, bounded pktmon counters-only session (packet/drop COUNTS per NIC -
+    /// never packet content or payload) and return its raw text output. See
+    /// NetPulse.PrivilegedAgent.PacketCounterCaptureAction for the full scope/privacy notes.
+    /// </summary>
+    CapturePacketCounters,
 }

@@ -27,11 +27,14 @@ public sealed class ElevatedHelperOperationLauncher : IElevatedOperationLauncher
 
     public async Task<PrivilegedOperationResult> ExecuteAsync(PrivilegedOperationRequest request, CancellationToken cancellationToken)
     {
-        if (!AdapterIdValidator.TryValidate(request.AdapterId, out var adapterError))
-            return Failed(request, adapterError);
-
-        if (!DnsServerAddressValidator.TryValidate(request.Parameters, out var dnsError))
-            return Failed(request, dnsError);
+        var validationError = request.Capability switch
+        {
+            PrivilegedCapability.SetAdapterDnsServers => ValidateSetAdapterDnsServers(request),
+            PrivilegedCapability.CapturePacketCounters => ValidateCapturePacketCounters(request),
+            _ => $"Capability '{request.Capability}' has no client-side validation registered.",
+        };
+        if (validationError is not null)
+            return Failed(request, validationError);
 
         var hostPath = Path.Combine(AppContext.BaseDirectory, HostExecutableName);
         if (!File.Exists(hostPath))
@@ -92,6 +95,22 @@ public sealed class ElevatedHelperOperationLauncher : IElevatedOperationLauncher
             // privileged-operation outcome be reported clearly rather than crash the caller.
             return Failed(request, $"Elevated helper execution failed: {ex.Message}");
         }
+    }
+
+    private static string? ValidateSetAdapterDnsServers(PrivilegedOperationRequest request)
+    {
+        if (!AdapterIdValidator.TryValidate(request.AdapterId, out var adapterError))
+            return adapterError;
+
+        return DnsServerAddressValidator.TryValidate(request.Parameters, out var dnsError) ? null : dnsError;
+    }
+
+    private static string? ValidateCapturePacketCounters(PrivilegedOperationRequest request)
+    {
+        if (request.Parameters.Count != 1)
+            return $"Expected exactly one parameter (capture duration in seconds), got {request.Parameters.Count}.";
+
+        return PacketCaptureDurationValidator.TryValidate(request.Parameters[0], out _, out var error) ? null : error;
     }
 
     private static PrivilegedOperationResult Failed(PrivilegedOperationRequest request, string error) =>

@@ -17,11 +17,15 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
 
 ## 2. What is actually true right now (verified, not claimed)
 
-- Builds clean, 0 errors/0 warnings. 163 tests pass across four suites: 104 unit (fakes),
-  50 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read, plus `NetPulse.App`'s
-  `FindingRowViewModel`), 5 safety (recovery lifecycle, fakes), 4 performance (real
-  CPU/allocation benchmarks). Re-run all four before trusting this number - it will have
-  moved by the time you read this.
+- Builds clean, 0 errors/0 warnings. 211 tests pass across four suites: 134 unit (fakes),
+  68 integration (real adapter/ICMP/TCP/DNS/SQLite/WMI-read/IP-Helper/loopback-HTTP, plus
+  `NetPulse.App`'s `FindingRowViewModel`), 5 safety (recovery lifecycle, fakes), 4 performance
+  (real CPU/allocation benchmarks). Re-run all four before trusting this number - it will
+  have moved by the time you read this.
+- The dashboard UI is now a `TabControl` (Adaptadores / Diagnóstico / Red por proceso /
+  Bufferbloat / Captura avanzada) instead of one long vertically-stacked screen - the
+  original single-screen layout was reported as cluttered/unintuitive, and adding Modules
+  E/F/G to it would have made that materially worse.
 - Diagnostics (ICMP + TCP confirmation + DNS resolution timing) are real and tested.
 - The recommendation engine (6 rules) is real and tested. Exactly one rule
   (`SlowDnsResolutionRule`) has an applyable action behind it.
@@ -46,9 +50,46 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
   read-only grid, refreshed automatically on selection change. No write path exists at all,
   per the brief's explicit instruction not to add one in this pass. 6 new real integration
   tests in `WmiAdapterAdvancedPropertiesReaderTests.cs`.
-- **Not implemented at all:** bufferbloat active-load testing (Module E), per-process
-  bandwidth accounting (Module F), pktmon/ETW advanced diagnostics (Module G), WinUI 3
-  migration.
+- **Module E (bufferbloat) is now implemented**, with a deliberate scope decision: load is
+  generated against Cloudflare's public speed-test endpoints (`speed.cloudflare.com/__down`
+  and `/__up`) rather than a self-hosted endpoint - the user chose this explicitly, aware it
+  is a third party outside this project's control. The request/response shape was verified
+  once, manually, via `curl` before writing `CloudflareLoadGenerationService` (not guessed).
+  Reachable only from its own dedicated "Bufferbloat" tab/button - never bundled into
+  "Ejecutar diagnóstico" - per the non-negotiable constraint that only a human may trigger a
+  real load run; this automated session never did so itself. A real cancellation bug was
+  found by the new integration tests (an already-cancelled caller token made the load loop's
+  condition false on its very first check, so it returned silently instead of throwing) and
+  fixed with an explicit `ThrowIfCancellationRequested()` before the loop. Grading thresholds
+  (`BufferbloatSeverity`) are this project's own bucketing, explicitly not presented as an
+  industry standard.
+- **Module F (per-process network) is now implemented, with a narrower, more honest scope
+  than literal "per-process bandwidth."** Windows has no unelevated, non-ETW API for real
+  per-process byte counters - Resource Monitor's own figures rely on ETW. Rather than
+  fabricate an estimate (splitting adapter throughput across active connections, for
+  example), this ships **connection visibility** (`ProcessNetworkConnectionsReader`, via
+  `GetExtendedTcpTable` - the same mechanism `netstat -ano` uses, no elevation needed, IPv4
+  TCP only) shown **alongside**, never fused with, each interface's real WMI-measured
+  throughput rate (`WmiAdapterThroughputReader`). The UI is explicit that this is not a
+  bandwidth-per-process number.
+- **Module G (pktmon/ETW) is now implemented, scoped down deliberately from full packet
+  capture to counters-only.** Verified on this machine that even `pktmon list` refuses
+  unelevated ("Acceso denegado"), so every pktmon interaction goes through the same
+  elevation boundary as the DNS action (`PrivilegedCapability.CapturePacketCounters`,
+  `PacketCounterCaptureAction`, a new branch in `NetPulse.PrivilegedAgent.Host`). It runs
+  `pktmon start --counters-only --comp nics`, sleeps for a capped, caller-chosen duration
+  (1-60 s, enforced independently inside the elevated host), reads `pktmon counters`, then
+  stops and unloads the driver - never capturing packet content or payload, and showing the
+  raw, unparsed text output rather than a derived summary this project did not directly
+  observe. `--comp nics` (not a specific adapter id) because resolving a specific component
+  id itself needs an elevated `pktmon list` call first, deferred to keep the elevated code
+  path simple. Like `SetAdapterDnsServersAction`, this automated session has never triggered
+  a real elevated pktmon run - that first run must be a deliberate, manual action by a
+  person.
+- A DNS-action usability bug was fixed: the post-apply/verify status message used to show
+  raw WMI-flavored text that a user reported as unclear about whether the change actually
+  worked. It now spells out before/requested/now explicitly in plain Spanish.
+- WinUI 3 migration remains not implemented (environment constraint, see §7 below).
 
 If any of the above sounds wrong when you check it, trust the code and the test run over
 this document - re-verify, don't assume.
@@ -128,12 +169,14 @@ revealed needs automated coverage going forward (per
 - **Consider exposing `DiagnosticOptions.TcpConfirmationPort`** in the UI if real-world use
   shows 443 is frequently wrong for a given target (e.g. targets that only answer on 80).
 
-## 6. Priority 3: the four unstarted modules, each with a concrete technical plan
+## 6. Priority 3: the four modules (historical planning - all four are now implemented)
 
-Each of these is substantial (multi-day) work, not a quick addition. Read the brief's own
-original module description (§6 Modules E/F/G and §3's advanced-adapter-properties ask)
-before starting - this section gives the *implementation* angle, not a restatement of the
-requirement.
+**Status: all four modules below are now implemented** (see §2's bullets for what actually
+shipped and where each deviated from the plan sketched here - notably Module F's honest
+scope-down to connection visibility rather than fabricated bandwidth numbers, and Module G's
+scope-down to counters-only rather than full packet capture). The subsections below are kept
+as the original planning record, not rewritten to match what shipped - read §2 first for the
+current truth, and treat anything here that conflicts with §2 as superseded.
 
 ### 6.1 Module E — Bufferbloat (active-load latency test)
 

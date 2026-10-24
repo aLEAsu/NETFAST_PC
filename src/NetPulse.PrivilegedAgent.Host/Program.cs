@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Management;
 using System.Text.Json;
 using NetPulse.Domain.PrivilegedOperations;
@@ -39,9 +40,9 @@ internal static class Program
     private static HostResult Run(string[] args)
     {
         if (args.Length != 4)
-            return new HostResult(false, null, $"Expected 4 arguments (capability, adapterId, dnsServers, resultFilePath), got {args.Length}.");
+            return new HostResult(false, null, $"Expected 4 arguments (capability, adapterId, parameters, resultFilePath), got {args.Length}.");
 
-        var (capabilityName, adapterId, dnsServersCsv, resultFilePath) = (args[0], args[1], args[2], args[3]);
+        var (capabilityName, adapterId, parametersCsv, resultFilePath) = (args[0], args[1], args[2], args[3]);
 
         if (!Enum.TryParse<PrivilegedCapability>(capabilityName, out var capability))
             return new HostResult(false, null, $"'{capabilityName}' is not an allow-listed capability.");
@@ -49,6 +50,20 @@ internal static class Program
         if (!IsResultPathAllowed(resultFilePath))
             return new HostResult(false, null, "Result file path is outside the allowed directory.");
 
+        // Each capability validates its own parameters here - they do not share a shape
+        // (DNS needs an adapter id + a server list; a pktmon capture needs neither, just a
+        // bounded duration), so there is deliberately no single validation step shared by
+        // every capability before this dispatch.
+        return capability switch
+        {
+            PrivilegedCapability.SetAdapterDnsServers => RunSetAdapterDnsServers(adapterId, parametersCsv),
+            PrivilegedCapability.CapturePacketCounters => RunCapturePacketCounters(parametersCsv),
+            _ => new HostResult(false, null, $"Capability '{capability}' has no implementation."),
+        };
+    }
+
+    private static HostResult RunSetAdapterDnsServers(string adapterId, string dnsServersCsv)
+    {
         if (!AdapterIdValidator.TryValidate(adapterId, out var adapterError))
             return new HostResult(false, null, adapterError);
 
@@ -56,11 +71,7 @@ internal static class Program
         if (!DnsServerAddressValidator.TryValidate(dnsServers, out var dnsError))
             return new HostResult(false, null, dnsError);
 
-        return capability switch
-        {
-            PrivilegedCapability.SetAdapterDnsServers => SetAdapterDnsServers(adapterId, dnsServers),
-            _ => new HostResult(false, null, $"Capability '{capability}' has no implementation."),
-        };
+        return SetAdapterDnsServers(adapterId, dnsServers);
     }
 
     private static bool IsResultPathAllowed(string resultFilePath)
@@ -114,6 +125,78 @@ internal static class Program
         }
 
         return new HostResult(false, null, $"No adapter configuration matching '{adapterId}' was found.");
+    }
+
+    /// <summary>
+    /// Runs a bounded pktmon counters-only session and returns its raw, unparsed text
+    /// output - never packet content, never a parsed/derived number this project did not
+    /// directly observe. "--comp nics" scopes the count to network adapters only (pktmon's
+    /// own documented selector keyword, not a specific adapter id - enumerating a specific
+    /// adapter's component id itself requires an elevated `pktmon list` call, which this
+    /// first pass skips to keep the elevated code path simple and auditable). The hard
+    /// duration cap is enforced here, independently of whatever the caller already checked,
+    /// per the brief's requirement that the cap live at the privileged boundary itself.
+    /// </summary>
+    private static HostResult RunCapturePacketCounters(string durationText)
+    {
+        if (!PacketCaptureDurationValidator.TryValidate(durationText, out var durationSeconds, out var durationError))
+            return new HostResult(false, null, durationError);
+
+        try
+        {
+            RunPktmon("start", "--counters-only", "--comp", "nics");
+            RunPktmon("reset");
+            Thread.Sleep(TimeSpan.FromSeconds(durationSeconds));
+            var countersOutput = RunPktmon("counters");
+            RunPktmon("stop");
+            RunPktmon("unload");
+
+            return new HostResult(true, countersOutput, null);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort cleanup even on failure, so a failed capture never leaves
+            // pktmon's driver loaded and counting in the background.
+            TryRunPktmonIgnoringErrors("stop");
+            TryRunPktmonIgnoringErrors("unload");
+            return new HostResult(false, null, $"pktmon capture failed: {ex.Message}");
+        }
+    }
+
+    private static string RunPktmon(params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("pktmon.exe")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in arguments)
+            startInfo.ArgumentList.Add(argument);
+
+        using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("Could not start pktmon.exe.");
+        string stdout = process.StandardOutput.ReadToEnd();
+        string stderr = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"pktmon {string.Join(' ', arguments)} exited with code {process.ExitCode}: {stderr}");
+
+        return stdout;
+    }
+
+    private static void TryRunPktmonIgnoringErrors(params string[] arguments)
+    {
+        try
+        {
+            RunPktmon(arguments);
+        }
+        catch
+        {
+            // Cleanup is best-effort: if pktmon was never started, "stop"/"unload" failing
+            // is expected, not a new error worth surfacing over the original failure.
+        }
     }
 
     private static void WriteResult(string? resultFilePath, HostResult result)

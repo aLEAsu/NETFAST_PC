@@ -48,6 +48,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ConnectionDiagnosticUseCase>();
         services.AddSingleton(_ => new RecommendationEngine(DefaultRecommendationRules.Create()));
         services.AddSingleton<GenerateRecommendationsUseCase>();
+        services.AddSingleton<ILoadGenerationService>(_ => new CloudflareLoadGenerationService());
+        services.AddSingleton<BufferbloatUseCase>();
 
         // Phase 5's privileged action: registered so DashboardViewModel can construct
         // SetAdapterDnsServersAction on demand (it needs per-use adapter id + server list
@@ -55,6 +57,8 @@ public partial class App : System.Windows.Application
         // singleton - see DashboardViewModel.ApplyDnsRecommendationAsync).
         services.AddSingleton<IAdapterDnsConfigurationReader, WmiAdapterDnsConfigurationReader>();
         services.AddSingleton<IAdapterAdvancedPropertiesReader, WmiAdapterAdvancedPropertiesReader>();
+        services.AddSingleton<IProcessNetworkConnectionsReader, ProcessNetworkConnectionsReader>();
+        services.AddSingleton<IAdapterThroughputReader, WmiAdapterThroughputReader>();
         services.AddSingleton<IElevatedOperationLauncher, ElevatedHelperOperationLauncher>();
         services.AddSingleton<IPrivilegedOperationAuditLog>(_ => new SqlitePrivilegedOperationAuditLog(dbPath));
 

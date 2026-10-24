@@ -24,9 +24,13 @@ public sealed partial class DashboardViewModel : ObservableObject
     private readonly GenerateRecommendationsUseCase _generateRecommendations;
     private readonly IAdapterDnsConfigurationReader _dnsReader;
     private readonly IAdapterAdvancedPropertiesReader _advancedPropertiesReader;
+    private readonly IProcessNetworkConnectionsReader _processConnectionsReader;
+    private readonly IAdapterThroughputReader _adapterThroughputReader;
+    private readonly BufferbloatUseCase _bufferbloatUseCase;
     private readonly IElevatedOperationLauncher _elevatedLauncher;
     private readonly IPrivilegedOperationAuditLog _auditLog;
     private CancellationTokenSource? _runCancellation;
+    private CancellationTokenSource? _bufferbloatCancellation;
     private SetAdapterDnsServersAction? _lastDnsAction;
     private string? _lastDnsCapturedState;
 
@@ -41,6 +45,9 @@ public sealed partial class DashboardViewModel : ObservableObject
         GenerateRecommendationsUseCase generateRecommendations,
         IAdapterDnsConfigurationReader dnsReader,
         IAdapterAdvancedPropertiesReader advancedPropertiesReader,
+        IProcessNetworkConnectionsReader processConnectionsReader,
+        IAdapterThroughputReader adapterThroughputReader,
+        BufferbloatUseCase bufferbloatUseCase,
         IElevatedOperationLauncher elevatedLauncher,
         IPrivilegedOperationAuditLog auditLog)
     {
@@ -49,14 +56,22 @@ public sealed partial class DashboardViewModel : ObservableObject
         _generateRecommendations = generateRecommendations;
         _dnsReader = dnsReader;
         _advancedPropertiesReader = advancedPropertiesReader;
+        _processConnectionsReader = processConnectionsReader;
+        _adapterThroughputReader = adapterThroughputReader;
+        _bufferbloatUseCase = bufferbloatUseCase;
         _elevatedLauncher = elevatedLauncher;
         _auditLog = auditLog;
+        _packetCaptureAction = new PacketCounterCaptureAction(elevatedLauncher, auditLog);
     }
+
+    private readonly PacketCounterCaptureAction _packetCaptureAction;
 
     public ObservableCollection<AdapterRowViewModel> Adapters { get; } = new();
     public ObservableCollection<FindingRowViewModel> Findings { get; } = new();
     public ObservableCollection<RecommendationRowViewModel> Recommendations { get; } = new();
     public ObservableCollection<AdvancedPropertyRowViewModel> AdvancedProperties { get; } = new();
+    public ObservableCollection<ProcessConnectionRowViewModel> ProcessConnections { get; } = new();
+    public ObservableCollection<AdapterThroughputRowViewModel> AdapterThroughput { get; } = new();
 
     public IReadOnlyList<DiagnosticProfile> AvailableProfiles => DiagnosticProfileCatalog.All;
 
@@ -102,6 +117,45 @@ public sealed partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private bool _showVirtualAdapters;
 
+    [ObservableProperty]
+    private string _processConnectionsStatusText = "Pulsa \"Actualizar\" para ver qué procesos tienen conexiones de red activas ahora mismo.";
+
+    [ObservableProperty]
+    private bool _isLoadingProcessConnections;
+
+    public IReadOnlyList<LoadDirection> BufferbloatDirections { get; } = new[] { LoadDirection.Download, LoadDirection.Upload };
+    public IReadOnlyList<int> BufferbloatDurationChoices { get; } = new[] { 5, 10, 15, 20, 30 };
+    public IReadOnlyList<int> PacketCaptureDurationChoices { get; } = new[] { 5, 15, 30, 60 };
+
+    [ObservableProperty]
+    private string _bufferbloatTargetText = "1.1.1.1";
+
+    [ObservableProperty]
+    private LoadDirection _selectedBufferbloatDirection = LoadDirection.Download;
+
+    [ObservableProperty]
+    private int _selectedBufferbloatDurationSeconds = 10;
+
+    [ObservableProperty]
+    private bool _isRunningBufferbloatTest;
+
+    [ObservableProperty]
+    private string _bufferbloatStatusText =
+        "Mide la latencia en reposo y luego bajo carga real. Esta prueba contacta speed.cloudflare.com - " +
+        "no se ejecuta nunca automáticamente, solo cuando pulsas \"Ejecutar prueba de bufferbloat\".";
+
+    [ObservableProperty]
+    private int _selectedPacketCaptureDurationSeconds = 15;
+
+    [ObservableProperty]
+    private bool _isCapturingPackets;
+
+    [ObservableProperty]
+    private string _packetCaptureStatusText = "Sin capturas todavía. Requiere aprobar un control de UAC de Windows.";
+
+    [ObservableProperty]
+    private string _packetCaptureRawOutputText = string.Empty;
+
     partial void OnSelectedProfileChanged(DiagnosticProfile value)
     {
         var settings = DiagnosticProfileCatalog.Get(value);
@@ -145,6 +199,181 @@ public sealed partial class DashboardViewModel : ObservableObject
         catch (Exception ex)
         {
             AdvancedPropertiesStatusText = $"No se pudieron leer las propiedades avanzadas: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Module F (brief §6.2): a manual, on-demand snapshot - deliberately not a live
+    /// auto-refreshing timer, per the project's "no unbounded background polling" principle
+    /// (see 01-architecture.md §2). Shows which processes own which active TCP connections
+    /// (a real, direct observation) alongside each interface's current real throughput rate
+    /// - the two are shown side by side, never combined into a fabricated "bytes used by
+    /// this process" figure, because Windows does not expose that without ETW/elevation.
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshProcessConnectionsAsync()
+    {
+        IsLoadingProcessConnections = true;
+        ProcessConnectionsStatusText = "Leyendo conexiones activas y velocidad de los adaptadores...";
+
+        try
+        {
+            var connections = await _processConnectionsReader.GetActiveConnectionsAsync(CancellationToken.None);
+            var throughput = await _adapterThroughputReader.GetCurrentThroughputAsync(CancellationToken.None);
+
+            ProcessConnections.Clear();
+            foreach (var connection in connections)
+                ProcessConnections.Add(new ProcessConnectionRowViewModel(connection));
+
+            AdapterThroughput.Clear();
+            foreach (var sample in throughput)
+                AdapterThroughput.Add(new AdapterThroughputRowViewModel(sample));
+
+            ProcessConnectionsStatusText =
+                $"{connections.Count} conexión(es) TCP activa(s) a las {DateTimeOffset.Now:T}. " +
+                "Esto muestra qué proceso tiene cada conexión abierta, no cuántos bytes transmite - " +
+                "Windows no expone eso sin herramientas de más bajo nivel (ETW), así que esta aplicación no inventa esa cifra.";
+        }
+        catch (Exception ex)
+        {
+            ProcessConnectionsStatusText = $"No se pudieron leer las conexiones de red: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingProcessConnections = false;
+        }
+    }
+
+    private bool CanRunBufferbloatTest() => !IsRunningBufferbloatTest;
+
+    /// <summary>
+    /// Module E (brief §6.1): the one path in this app that deliberately generates real
+    /// network load, reachable only from this dedicated button with its own status line -
+    /// never bundled into "Ejecutar diagnóstico". The automated session that wrote this
+    /// method has never triggered it against the real internet itself, per the project's
+    /// constraint that only a human, interactively, may trigger a real run of this kind.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRunBufferbloatTest))]
+    private async Task RunBufferbloatTestAsync()
+    {
+        var target = BufferbloatTargetText.Trim();
+        if (target.Length == 0)
+        {
+            BufferbloatStatusText = "Ingresa un objetivo para medir la latencia (ej. 1.1.1.1).";
+            return;
+        }
+
+        IsRunningBufferbloatTest = true;
+        RunBufferbloatTestCommand.NotifyCanExecuteChanged();
+        _bufferbloatCancellation = new CancellationTokenSource();
+        var directionText = SelectedBufferbloatDirection == LoadDirection.Download ? "bajada" : "subida";
+        BufferbloatStatusText = $"Midiendo latencia en reposo contra {target}...";
+
+        try
+        {
+            var options = new BufferbloatOptions(target, SelectedBufferbloatDirection, TimeSpan.FromSeconds(SelectedBufferbloatDurationSeconds));
+
+            BufferbloatStatusText = $"Latencia en reposo medida. Generando carga real de {directionText} durante {SelectedBufferbloatDurationSeconds} s contra speed.cloudflare.com mientras se sigue midiendo la latencia...";
+
+            var sample = await _bufferbloatUseCase.RunAsync(options, _bufferbloatCancellation.Token);
+
+            var addedMs = sample.AddedMedianLatency.TotalMilliseconds;
+            var severityText = sample.Severity switch
+            {
+                BufferbloatSeverity.Minimal => "Mínimo - la latencia casi no cambió bajo carga.",
+                BufferbloatSeverity.Moderate => "Moderado - hay un aumento perceptible de latencia bajo carga.",
+                BufferbloatSeverity.Significant => "Significativo - la latencia bajo carga sube de forma notoria; esto puede afectar videollamadas o juegos mientras algo más descarga/sube.",
+                BufferbloatSeverity.Severe => "Severo - la latencia bajo carga sube mucho; es un síntoma clásico de bufferbloat en el router/módem.",
+                _ => "Desconocido",
+            };
+
+            BufferbloatStatusText =
+                $"Resultado ({directionText}, {SelectedBufferbloatDurationSeconds} s contra {target}): " +
+                $"en reposo la mediana fue {sample.AtRest.Median.TotalMilliseconds:F0} ms (P95 {sample.AtRest.P95.TotalMilliseconds:F0} ms); " +
+                $"bajo carga la mediana fue {sample.UnderLoad.Median.TotalMilliseconds:F0} ms (P95 {sample.UnderLoad.P95.TotalMilliseconds:F0} ms). " +
+                $"Latencia agregada por la carga: {addedMs:F0} ms. Clasificación de esta app (no un estándar de la industria): {severityText} " +
+                "Esto mide un momento puntual, no un diagnóstico permanente - repite la prueba si quieres confirmar el patrón.";
+        }
+        catch (OperationCanceledException)
+        {
+            BufferbloatStatusText = "Prueba de bufferbloat cancelada.";
+        }
+        catch (Exception ex)
+        {
+            BufferbloatStatusText = $"La prueba de bufferbloat falló: {ex.Message}";
+        }
+        finally
+        {
+            IsRunningBufferbloatTest = false;
+            RunBufferbloatTestCommand.NotifyCanExecuteChanged();
+            _bufferbloatCancellation = null;
+        }
+    }
+
+    [RelayCommand]
+    private void CancelBufferbloatTest()
+    {
+        _bufferbloatCancellation?.Cancel();
+    }
+
+    private bool CanRunPacketCapture() => !IsCapturingPackets;
+
+    /// <summary>
+    /// Module G (brief §6.3): the one path in this app that requires a second UAC-elevated
+    /// capability. Same confirmation-then-UAC pattern as the DNS action, and the same
+    /// discipline: the automated session that wrote this has never triggered a real
+    /// elevated pktmon run - its first real run must be a deliberate, manual action by a
+    /// person, exactly like SetAdapterDnsServersAction's first real DNS write was.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRunPacketCapture))]
+    private async Task RunPacketCaptureAsync()
+    {
+        var descriptor = _packetCaptureAction.Describe();
+        var confirmed = MessageBox.Show(
+            $"{descriptor.Title}\n\n" +
+            $"Duración: {SelectedPacketCaptureDurationSeconds} segundos\n\n" +
+            $"{descriptor.Objective}\n\n" +
+            "Esto va a lanzar un proceso auxiliar elevado y Windows va a mostrar un " +
+            "control de UAC. Tienes que aprobarlo tú mismo para que la captura se " +
+            "ejecute - esta aplicación no puede hacerlo por ti.\n\n" +
+            $"Privacidad: {string.Join(" ", descriptor.KnownLimitations)}\n\n" +
+            "¿Continuar?",
+            "Confirmar captura de contadores de paquetes",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
+
+        if (!confirmed)
+        {
+            PacketCaptureStatusText = "Captura cancelada - no se hizo nada.";
+            return;
+        }
+
+        IsCapturingPackets = true;
+        RunPacketCaptureCommand.NotifyCanExecuteChanged();
+        PacketCaptureStatusText = $"Capturando durante {SelectedPacketCaptureDurationSeconds} s - aprueba el control de UAC de Windows para continuar...";
+
+        try
+        {
+            var result = await _packetCaptureAction.CaptureAsync(SelectedPacketCaptureDurationSeconds, CancellationToken.None);
+
+            if (result.Succeeded)
+            {
+                PacketCaptureRawOutputText = result.RawOutput ?? string.Empty;
+                PacketCaptureStatusText = $"Captura completa a las {DateTimeOffset.Now:T}. Salida sin procesar de 'pktmon counters' arriba.";
+            }
+            else
+            {
+                PacketCaptureStatusText = $"La captura falló: {result.Error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            PacketCaptureStatusText = $"La captura falló: {ex.Message}";
+        }
+        finally
+        {
+            IsCapturingPackets = false;
+            RunPacketCaptureCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -328,10 +557,20 @@ public sealed partial class DashboardViewModel : ObservableObject
         SetStatus("Verificando que el cambio surtió efecto...", StatusSeverity.Progress);
         var verifyResult = await action.VerifyAsync(CancellationToken.None);
         var verified = verifyResult.Outcome == OptimizationOutcome.VerifiedImproved;
+
+        // The previous wording here ("Servidores DNS cambiados y verificados: <raw WMI
+        // dump>") was reported as confusing - it didn't say in plain terms whether the
+        // change actually took effect or what "verified" meant. Read the observed servers
+        // directly (cheap, read-only) instead of parsing them out of verifyResult.Details,
+        // and spell out before/requested/now explicitly so there's nothing left to infer.
+        var observedServers = await _dnsReader.GetDnsServersAsync(adapter.Id, CancellationToken.None);
+        var observedText = observedServers.Count > 0 ? string.Join(", ", observedServers) : "automático (asignado por el router/DHCP)";
+        var requestedText = string.Join(", ", SuggestedPublicDnsServers);
+
         SetStatus(
             verified
-                ? $"Servidores DNS cambiados y verificados: {verifyResult.Details}. Usa Revertir para restaurar la configuración anterior."
-                : $"El cambio de DNS se aplicó pero no se pudo verificar ({verifyResult.Details}). Usa Revertir si esto no es lo que esperabas.",
+                ? $"Listo: el cambio SÍ tomó efecto. El adaptador \"{adapter.Name}\" ahora usa {observedText} - exactamente lo que se pidió ({requestedText}). Si quieres deshacerlo, usa \"Revertir cambio de DNS\"."
+                : $"Atención: el cambio NO tomó efecto. Se pidió usar {requestedText}, pero \"{adapter.Name}\" todavía reporta {observedText}. Puede ser que Windows aún no haya aplicado el cambio o que el adaptador lo haya ignorado - prueba \"Revertir cambio de DNS\" para dejarlo como estaba antes, o ejecuta el diagnóstico de nuevo en un momento para volver a comprobar.",
             verified ? StatusSeverity.Success : StatusSeverity.Warning);
 
         CanRollbackDns = true;
@@ -345,12 +584,15 @@ public sealed partial class DashboardViewModel : ObservableObject
             return;
 
         SetStatus("Revirtiendo - aprueba el control de UAC de Windows para continuar...", StatusSeverity.Progress);
+        var restoredText = string.IsNullOrEmpty(_lastDnsCapturedState)
+            ? "automático (asignado por el router/DHCP)"
+            : _lastDnsCapturedState.Replace(",", ", ");
         var result = await _lastDnsAction.RollbackAsync(_lastDnsCapturedState, CancellationToken.None);
 
         SetStatus(
             result.Outcome == OptimizationOutcome.RolledBack
-                ? "Reversión exitosa - la configuración DNS se restauró a como estaba antes del cambio."
-                : $"La reversión falló: {result.Error}",
+                ? $"Listo: se restauró el DNS a como estaba antes del cambio ({restoredText})."
+                : $"La reversión falló: {result.Error}. El adaptador puede seguir usando los servidores DNS que se aplicaron - vuelve a intentarlo.",
             result.Outcome == OptimizationOutcome.RolledBack ? StatusSeverity.Success : StatusSeverity.Error);
 
         if (result.Outcome == OptimizationOutcome.RolledBack)
