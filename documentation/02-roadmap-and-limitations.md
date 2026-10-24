@@ -232,6 +232,6 @@ that needs a CA purchase, which is the user's own step.
    `installer\build.ps1 -SigningThumbprint <real-thumbprint>` with it before any real
    distribution - see `04-phase7-distribution.md` §5. **Still not done** - requires a
    purchase and identity verification by whoever owns this project, not an automated step.
-7. **New:** Module E (bufferbloat) is built and tested against a local loopback server, but
-   its first real run against the actual internet (speed.cloudflare.com) has not yet been
-   manually triggered by a person - same discipline as steps 2 and the pktmon capture above.
+7. ~~Module E (bufferbloat)'s first real run against the actual internet.~~ **Done** -
+   download, 10 s, target 1.1.1.1: 22 ms at rest -> 23 ms under load (+1 ms), classified
+   "Mínimo", consistent with a healthy connection.

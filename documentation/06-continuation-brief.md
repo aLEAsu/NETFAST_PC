@@ -38,8 +38,11 @@ environment has no Visual Studio/Windows App SDK - see `01-architecture.md` §3)
   `Dirección`) because `Process.StandardOutput` was read with the console's OEM codepage
   instead of UTF-8 (pktmon's actual output encoding); fixed by setting
   `StandardOutputEncoding`/`StandardErrorEncoding` explicitly. **Module E (bufferbloat) has
-  not yet had its first real run against the actual internet** - it is built and tested
-  against a local loopback server only, per the same "only a human triggers this" discipline.
+  now also been run for real by the user**, against the actual internet (download, 10 s,
+  target 1.1.1.1): median latency at rest 22 ms, under load 23 ms, +1 ms added - correctly
+  classified "Mínimo" (minimal), consistent with a healthy connection with no bufferbloat.
+  All four privileged/real-network-triggering capabilities in this app (DNS write, pktmon
+  capture, bufferbloat load) have now each had a genuine, human-triggered first run.
 - **Full Spanish localization is now complete**, including the Domain layer (diagnostic
   finding text and all 6 recommendation rules) - see §7's note below for what that involved.
 - Diagnostics (ICMP + TCP confirmation + DNS resolution timing) are real and tested.
