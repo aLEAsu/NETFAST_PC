@@ -171,6 +171,12 @@ internal static class Program
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
+            // Without this, redirected output is read using the console's OEM codepage
+            // (CP437 on this machine), not the UTF-8 pktmon actually writes - verified by a
+            // real capture whose accented characters ("Dirección", "Recepción") came back
+            // as mojibake ("Direcci├│n") until this was added.
+            StandardOutputEncoding = System.Text.Encoding.UTF8,
+            StandardErrorEncoding = System.Text.Encoding.UTF8,
         };
         foreach (var argument in arguments)
             startInfo.ArgumentList.Add(argument);
