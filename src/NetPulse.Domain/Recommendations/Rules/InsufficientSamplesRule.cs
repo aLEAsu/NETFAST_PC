@@ -8,18 +8,18 @@ public sealed class InsufficientSamplesRule : IRecommendationRule
 {
     public OptimizationDescriptor Descriptor { get; } = new(
         Id: "recommend.insufficient-samples",
-        Title: "Collect more samples before drawing conclusions",
-        Objective: "Avoid treating measurement noise as a real network problem.",
-        Evidence: "Fewer samples were collected than the minimum needed to distinguish a real effect from random variation.",
-        Preconditions: new[] { "The diagnostic finding's confidence is Hypothesis due to low sample count." },
+        Title: "Recolectar más muestras antes de sacar conclusiones",
+        Objective: "Evitar tratar el ruido de medición como un problema de red real.",
+        Evidence: "Se recolectaron menos muestras que el mínimo necesario para distinguir un efecto real de la variación aleatoria.",
+        Preconditions: new[] { "La confianza del hallazgo de diagnóstico es Hipótesis debido a la baja cantidad de muestras." },
         Risk: OptimizationRisk.Low,
         RequiredPermissions: Array.Empty<string>(),
-        VerificationMethod: "Re-run the diagnostic with SampleCount >= 10 against the same target.",
-        SuccessCriterion: "The re-run produces a Confirmed, Probable, ExternalLimitation, or Healthy finding instead of Hypothesis.",
-        FailureCriterion: "The re-run still has fewer than 10 samples (e.g. it was cancelled early).",
-        RollbackMethod: "Not applicable - this recommendation only suggests re-running a read-only diagnostic.",
-        ReferenceDocumentation: new[] { "Project brief §7: the engine must not attribute effects without sufficient samples." },
-        KnownLimitations: new[] { "Does not itself fix anything; it only improves the confidence of the next diagnostic." });
+        VerificationMethod: "Vuelve a ejecutar el diagnóstico con al menos 10 muestras contra el mismo destino.",
+        SuccessCriterion: "La nueva ejecución produce un hallazgo Confirmado, Probable, Limitación externa, o Saludable en vez de Hipótesis.",
+        FailureCriterion: "La nueva ejecución todavía tiene menos de 10 muestras (por ejemplo, se canceló antes de tiempo).",
+        RollbackMethod: "No aplica - esta recomendación solo sugiere volver a ejecutar un diagnóstico de solo lectura.",
+        ReferenceDocumentation: new[] { "Brief del proyecto §7: el motor no debe atribuir efectos sin muestras suficientes." },
+        KnownLimitations: new[] { "No corrige nada por sí misma; solo mejora la confianza del próximo diagnóstico." });
 
     public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
@@ -31,7 +31,7 @@ public sealed class InsufficientSamplesRule : IRecommendationRule
         return new TriggeredRecommendation(
             statistics.Target,
             Descriptor,
-            $"Only {statistics.SampleCount} sample(s) were collected for {statistics.Target}; re-run with more samples before acting on this result.",
+            $"Solo se recolectaron {statistics.SampleCount} muestra(s) para {statistics.Target}; vuelve a ejecutar con más muestras antes de actuar sobre este resultado.",
             finding.Confidence);
     }
 }

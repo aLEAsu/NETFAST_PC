@@ -34,7 +34,7 @@ public class HealthyNoActionRuleTests
     {
         var match = _rule.Evaluate(Evidence(Stats(), Finding(DiagnosticConfidence.Healthy)));
 
-        Assert.Equal("No change recommended", match!.Descriptor.Title);
+        Assert.Equal("No se recomienda ningún cambio", match!.Descriptor.Title);
         Assert.Empty(match.Descriptor.RequiredPermissions);
     }
 }

@@ -35,7 +35,7 @@ public class InsufficientSamplesRuleTests
     {
         var match = _rule.Evaluate(Evidence(Stats(sampleCount: 5), Finding(DiagnosticConfidence.Hypothesis)));
 
-        Assert.Contains("Not applicable", match!.Descriptor.RollbackMethod);
+        Assert.Contains("No aplica", match!.Descriptor.RollbackMethod);
         Assert.Empty(match.Descriptor.RequiredPermissions);
     }
 }

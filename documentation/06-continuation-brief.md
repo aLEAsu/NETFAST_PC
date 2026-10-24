@@ -294,21 +294,21 @@ followed for DNS.
 - **Second `IOptimizationAction`.** Before adding one, do the small refactor
   `05-code-audit-and-recommendations.md` §3 recommends (a lookup table from recommendation
   id → action factory) rather than growing `if` branches in `DashboardViewModel`.
-- **UI is now partly in Spanish - deliberately, partially.** At the user's request,
-  `NetPulse.App`'s chrome (window title, labels, buttons, status messages, the DNS
-  confirmation dialog, the global error dialog) and the enum displays in the three row
-  ViewModels (`SpanishDisplayNames.Risk`/`Confidence`, plus `AdapterKind`/Status/Speed in
-  `AdapterRowViewModel`) are in Spanish. `DiagnosticProfileCatalog`'s `DisplayName`/`Focus`
-  text is also Spanish now (safe - no test checks its exact content, only non-emptiness).
-  **Deliberately left in English:** every string that comes out of
-  `ConnectionDiagnosticUseCase.Classify` (`DiagnosticFinding.Summary`/`Evidence`/
-  `Limitations`) and the 6 recommendation rules' `OptimizationDescriptor` fields
-  (`Title`/`Objective`/`VerificationMethod`/etc.) - those are covered by ~100 exact-string
-  test assertions across `NetPulse.UnitTests`, and translating them is a separate, larger
-  pass (would mean touching every rule file and its tests in lockstep), not something to
-  do as a quick follow-on. If full localization is wanted, that Domain-layer pass - plus
-  deciding whether to keep English as a fallback/second language rather than replacing it
-  outright - is the next step, not an extension of this one.
+- **UI is now fully in Spanish, including the Domain layer.** The earlier version of this
+  note deferred `ConnectionDiagnosticUseCase.Classify`'s `DiagnosticFinding.Summary`/
+  `Evidence`/`Limitations` and the 6 recommendation rules' `OptimizationDescriptor` fields,
+  estimating "~100 exact-string test assertions" would need updating in lockstep. That
+  estimate turned out to be wrong when actually checked: a full grep across every test
+  project found only `finding.Id` (a stable identifier, e.g. `"connectivity.no-response"`)
+  was ever asserted on for the diagnostic findings, and only 4 small, specific assertions
+  touched rule descriptor prose (`HealthyNoActionRuleTests`, `HighMedianLatencyRuleTests`,
+  `InsufficientSamplesRuleTests`, `PacketLossInvestigateRuleTests`) - all four updated
+  alongside the translation. All 211 tests still pass. `HighJitterBufferbloatFollowUpRule`'s
+  text was also corrected while translating it: it used to say the bufferbloat load test
+  "does not exist in this codebase yet," which stopped being true once Module E shipped -
+  it now points at the real "Bufferbloat" tab. The word "bufferbloat" itself is kept
+  untranslated throughout (titles, tab name, UI) - it is the term actually used in
+  Spanish-language networking discourse, not a gap.
 
 ## 8. Working method (how this project has been built so far - keep doing this)
 

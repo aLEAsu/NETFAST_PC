@@ -94,21 +94,21 @@ public sealed class ConnectionDiagnosticUseCase
                 // connectivity problem by itself.
                 return new DiagnosticFinding(
                     Id: "connectivity.icmp-filtered-app-reachable",
-                    Summary: $"{stats.Target} did not respond to ICMP, but a direct TCP connection on port {tcpCheck.Port} succeeded in {tcpCheck.ConnectTime!.Value.TotalMilliseconds:F0} ms.",
+                    Summary: $"{stats.Target} no respondió a ICMP, pero una conexión TCP directa al puerto {tcpCheck.Port} tuvo éxito en {tcpCheck.ConnectTime!.Value.TotalMilliseconds:F0} ms.",
                     Confidence: DiagnosticConfidence.Healthy,
-                    Evidence: $"{stats.SampleCount} ICMP probes unanswered; TCP handshake to port {tcpCheck.Port} succeeded.",
-                    Limitations: new[] { "ICMP being filtered does not indicate a problem by itself - many networks and firewalls block it deliberately while allowing normal application traffic." });
+                    Evidence: $"{stats.SampleCount} sondeos ICMP sin respuesta; el enlace TCP al puerto {tcpCheck.Port} tuvo éxito.",
+                    Limitations: new[] { "Que se filtre ICMP no indica un problema por sí solo - muchas redes y firewalls lo bloquean deliberadamente mientras permiten el tráfico normal de aplicaciones." });
             }
 
             return new DiagnosticFinding(
                 Id: "connectivity.no-response",
-                Summary: $"No replies were received from {stats.Target}, and a direct TCP connection on port {tcpCheck.Port} also failed.",
+                Summary: $"No se recibieron respuestas de {stats.Target}, y una conexión TCP directa al puerto {tcpCheck.Port} también falló.",
                 Confidence: DiagnosticConfidence.Probable,
-                Evidence: $"{stats.SampleCount} ICMP probes sent, 0 responses. TCP connect to port {tcpCheck.Port}: {tcpCheck.Error}",
+                Evidence: $"{stats.SampleCount} sondeos ICMP enviados, 0 respuestas. Conexión TCP al puerto {tcpCheck.Port}: {tcpCheck.Error}",
                 Limitations: new[]
                 {
-                    "Two independent methods agreeing raises confidence but does not by itself confirm the cause (this PC vs. router vs. ISP vs. remote target).",
-                    $"A failed TCP connection on port {tcpCheck.Port} specifically means that port didn't answer - it does not rule out the target being reachable on a different port.",
+                    "Que dos métodos independientes coincidan aumenta la confianza, pero no confirma por sí solo la causa (esta PC vs. router vs. ISP vs. destino remoto).",
+                    $"Que falle la conexión TCP al puerto {tcpCheck.Port} significa específicamente que ese puerto no respondió - no descarta que el destino sea alcanzable por otro puerto.",
                 });
         }
 
@@ -116,38 +116,38 @@ public sealed class ConnectionDiagnosticUseCase
         {
             return new DiagnosticFinding(
                 Id: "connectivity.insufficient-samples",
-                Summary: $"Only {stats.SampleCount} samples were collected for {stats.Target}.",
+                Summary: $"Solo se recolectaron {stats.SampleCount} muestra(s) para {stats.Target}.",
                 Confidence: DiagnosticConfidence.Hypothesis,
-                Evidence: "Sample count is below the threshold needed to distinguish a real effect from measurement noise.",
-                Limitations: new[] { "Increase SampleCount and re-run before treating this result as conclusive." });
+                Evidence: "La cantidad de muestras está por debajo del umbral necesario para distinguir un efecto real del ruido de medición.",
+                Limitations: new[] { "Aumenta la cantidad de muestras y vuelve a ejecutar el diagnóstico antes de tratar este resultado como concluyente." });
         }
 
         if (stats.PacketLossPercent >= 2.0)
         {
             return new DiagnosticFinding(
                 Id: "connectivity.packet-loss",
-                Summary: $"{stats.PacketLossPercent:F1}% of probes to {stats.Target} received no reply.",
+                Summary: $"{stats.PacketLossPercent:F1}% de los sondeos a {stats.Target} no recibieron respuesta.",
                 Confidence: DiagnosticConfidence.Probable,
-                Evidence: $"{stats.SampleCount - stats.RespondedCount} of {stats.SampleCount} probes unanswered. TCP connect to port {tcpCheck.Port}: {(tcpCheck.Connected ? "succeeded" : "also failed")}.",
-                Limitations: new[] { "Measures ICMP reachability, not confirmed loss of this machine's own application traffic.", "May originate from the router, ISP, or remote target rather than this PC." });
+                Evidence: $"{stats.SampleCount - stats.RespondedCount} de {stats.SampleCount} sondeos sin respuesta. Conexión TCP al puerto {tcpCheck.Port}: {(tcpCheck.Connected ? "tuvo éxito" : "también falló")}.",
+                Limitations: new[] { "Mide la alcanzabilidad por ICMP, no confirma pérdida del propio tráfico de aplicación de esta máquina.", "Puede originarse en el router, el ISP, o el destino remoto, no necesariamente en esta PC." });
         }
 
         if (stats.JitterMeanAbsoluteDeviation > TimeSpan.FromMilliseconds(30))
         {
             return new DiagnosticFinding(
                 Id: "connectivity.high-jitter",
-                Summary: $"Latency to {stats.Target} varies by a mean of {stats.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms between consecutive samples.",
+                Summary: $"La latencia hacia {stats.Target} varía en promedio {stats.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms entre muestras consecutivas.",
                 Confidence: DiagnosticConfidence.Probable,
-                Evidence: $"Median {stats.Median.TotalMilliseconds:F1} ms, P95 {stats.P95.TotalMilliseconds:F1} ms, max {stats.Max.TotalMilliseconds:F1} ms.",
-                Limitations: new[] { "High variability alone does not identify the cause; compare against a bufferbloat test under load before attributing it to the local network." });
+                Evidence: $"Mediana {stats.Median.TotalMilliseconds:F1} ms, P95 {stats.P95.TotalMilliseconds:F1} ms, máximo {stats.Max.TotalMilliseconds:F1} ms.",
+                Limitations: new[] { "Una alta variabilidad por sí sola no identifica la causa; compara contra una prueba de bufferbloat bajo carga (pestaña \"Bufferbloat\") antes de atribuirla a la red local." });
         }
 
         return new DiagnosticFinding(
             Id: "connectivity.healthy",
-            Summary: $"Latency to {stats.Target} is stable: median {stats.Median.TotalMilliseconds:F1} ms, {stats.PacketLossPercent:F1}% loss.",
+            Summary: $"La latencia hacia {stats.Target} es estable: mediana {stats.Median.TotalMilliseconds:F1} ms, {stats.PacketLossPercent:F1}% de pérdida.",
             Confidence: DiagnosticConfidence.Healthy,
-            Evidence: $"{stats.SampleCount} samples, jitter {stats.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms.",
-            Limitations: new[] { "Reflects only this target and this time window; it is not a complete assessment of internet quality." });
+            Evidence: $"{stats.SampleCount} muestras, jitter {stats.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms.",
+            Limitations: new[] { "Refleja solo este destino y esta ventana de tiempo; no es una evaluación completa de la calidad de internet." });
     }
 }
 

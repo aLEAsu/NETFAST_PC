@@ -15,18 +15,18 @@ public sealed class HighMedianLatencyRule : IRecommendationRule
 
     public OptimizationDescriptor Descriptor { get; } = new(
         Id: "recommend.high-median-latency",
-        Title: "Check Wi-Fi vs. Ethernet and target distance before assuming a fixable problem",
-        Objective: "Avoid treating normal geographic/path latency as a defect fixable by a local change.",
-        Evidence: "Median round-trip time to this target is consistently high even though loss and jitter are both within normal range.",
-        Preconditions: new[] { $"Median RTT > {MedianThreshold.TotalMilliseconds:F0} ms.", "Packet loss and jitter are both within normal range for this run." },
+        Title: "Revisar Wi-Fi vs. Ethernet y la distancia al destino antes de asumir un problema corregible",
+        Objective: "Evitar tratar la latencia normal por geografía/ruta como un defecto corregible con un cambio local.",
+        Evidence: "El tiempo de ida y vuelta mediano hacia este destino es consistentemente alto aunque la pérdida y el jitter están dentro del rango normal.",
+        Preconditions: new[] { $"RTT mediano > {MedianThreshold.TotalMilliseconds:F0} ms.", "La pérdida de paquetes y el jitter están ambos dentro del rango normal para esta ejecución." },
         Risk: OptimizationRisk.Low,
         RequiredPermissions: Array.Empty<string>(),
-        VerificationMethod: "Compare against a wired connection (if currently on Wi-Fi) and against a geographically closer target.",
-        SuccessCriterion: "A wired connection or closer target shows meaningfully lower median latency, pointing at the original setup rather than this PC.",
-        FailureCriterion: "Latency stays high even wired and against a close target, suggesting an ISP-side or routing issue outside this PC's control.",
-        RollbackMethod: "Not applicable - this recommendation only suggests a comparison measurement.",
-        ReferenceDocumentation: new[] { "Project brief §2: distinguish what is under the PC's control from what depends on the router/ISP/remote infrastructure." },
-        KnownLimitations: new[] { "There is no universal 'good' latency number; the right baseline depends on physical distance to the target." });
+        VerificationMethod: "Compara contra una conexión cableada (si actualmente usas Wi-Fi) y contra un destino geográficamente más cercano.",
+        SuccessCriterion: "Una conexión cableada o un destino más cercano muestra una latencia mediana notablemente menor, señalando la configuración original en vez de esta PC.",
+        FailureCriterion: "La latencia se mantiene alta incluso por cable y contra un destino cercano, sugiriendo un problema del lado del ISP o de enrutamiento fuera del control de esta PC.",
+        RollbackMethod: "No aplica - esta recomendación solo sugiere una medición comparativa.",
+        ReferenceDocumentation: new[] { "Brief del proyecto §2: distinguir lo que está bajo el control de la PC de lo que depende del router/ISP/infraestructura remota." },
+        KnownLimitations: new[] { "No existe un número universal de latencia 'buena'; el punto de referencia correcto depende de la distancia física al destino." });
 
     public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
@@ -41,7 +41,7 @@ public sealed class HighMedianLatencyRule : IRecommendationRule
         return new TriggeredRecommendation(
             statistics.Target,
             Descriptor,
-            $"Median latency to {statistics.Target} is {statistics.Median.TotalMilliseconds:F1} ms with {statistics.PacketLossPercent:F1}% loss.",
+            $"La latencia mediana hacia {statistics.Target} es {statistics.Median.TotalMilliseconds:F1} ms con {statistics.PacketLossPercent:F1}% de pérdida.",
             finding.Confidence);
     }
 }

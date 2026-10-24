@@ -38,7 +38,7 @@ public class HighMedianLatencyRuleTests
     {
         var match = _rule.Evaluate(Evidence(Stats(medianMs: 300), Finding(DiagnosticConfidence.Healthy)));
 
-        Assert.Contains("distance", match!.Descriptor.Title, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("distancia", match!.Descriptor.Title, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(match.Descriptor.RequiredPermissions);
     }
 }

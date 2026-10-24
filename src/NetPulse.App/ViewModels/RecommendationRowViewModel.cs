@@ -18,8 +18,7 @@ public sealed class RecommendationRowViewModel
 
         Target = recommendation.Target;
         // Title/Explanation/NextStep/Limitations come straight from the Domain rule
-        // descriptors (English, deeply covered by exact-string test assertions) - not
-        // translated here; see FindingRowViewModel's equivalent note.
+        // descriptors - now in Spanish there too; see FindingRowViewModel's equivalent note.
         Title = descriptor.Title;
         Risk = SpanishDisplayNames.Risk(descriptor.Risk);
         BasisConfidence = SpanishDisplayNames.Confidence(recommendation.BasisConfidence);

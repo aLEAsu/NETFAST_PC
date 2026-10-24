@@ -13,18 +13,18 @@ public sealed class HealthyNoActionRule : IRecommendationRule
 {
     public OptimizationDescriptor Descriptor { get; } = new(
         Id: "recommend.healthy-no-action",
-        Title: "No change recommended",
-        Objective: "Avoid changing a setting that is not causing a measured problem.",
-        Evidence: "Latency, jitter, and packet loss are all within the normal range measured for this target.",
-        Preconditions: new[] { "The diagnostic finding's confidence is Healthy." },
+        Title: "No se recomienda ningún cambio",
+        Objective: "Evitar cambiar una configuración que no está causando un problema medido.",
+        Evidence: "La latencia, el jitter y la pérdida de paquetes están todos dentro del rango normal medido para este destino.",
+        Preconditions: new[] { "La confianza del hallazgo de diagnóstico es Saludable." },
         Risk: OptimizationRisk.Low,
         RequiredPermissions: Array.Empty<string>(),
-        VerificationMethod: "Re-run periodically; re-evaluate only if a new diagnostic shows loss, jitter, or median latency outside the normal range.",
-        SuccessCriterion: "Not applicable - there is nothing to verify because nothing is proposed.",
-        FailureCriterion: "Not applicable.",
-        RollbackMethod: "Not applicable - no change is proposed.",
-        ReferenceDocumentation: new[] { "Project brief §7 and §H: a profile may recommend no change when the current state is already adequate." },
-        KnownLimitations: new[] { "Reflects only the target and time window just measured, not a guarantee of future stability." });
+        VerificationMethod: "Vuelve a ejecutar el diagnóstico periódicamente; solo reevalúa si un nuevo diagnóstico muestra pérdida, jitter o latencia mediana fuera del rango normal.",
+        SuccessCriterion: "No aplica - no hay nada que verificar porque no se propone ningún cambio.",
+        FailureCriterion: "No aplica.",
+        RollbackMethod: "No aplica - no se propone ningún cambio.",
+        ReferenceDocumentation: new[] { "Brief del proyecto §7 y §H: un perfil puede recomendar no hacer ningún cambio cuando el estado actual ya es adecuado." },
+        KnownLimitations: new[] { "Refleja solo el destino y la ventana de tiempo recién medidos, no es una garantía de estabilidad futura." });
 
     public TriggeredRecommendation? Evaluate(NetworkEvidence evidence)
     {
@@ -36,7 +36,7 @@ public sealed class HealthyNoActionRule : IRecommendationRule
         return new TriggeredRecommendation(
             statistics.Target,
             Descriptor,
-            $"{statistics.Target} is within normal range: median {statistics.Median.TotalMilliseconds:F1} ms, {statistics.PacketLossPercent:F1}% loss, jitter {statistics.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms.",
+            $"{statistics.Target} está dentro del rango normal: mediana {statistics.Median.TotalMilliseconds:F1} ms, {statistics.PacketLossPercent:F1}% de pérdida, jitter {statistics.JitterMeanAbsoluteDeviation.TotalMilliseconds:F1} ms.",
             finding.Confidence);
     }
 }

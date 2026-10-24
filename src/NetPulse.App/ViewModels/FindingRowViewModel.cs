@@ -14,9 +14,9 @@ public sealed class FindingRowViewModel
         Target = stats.Target;
         Confidence = SpanishDisplayNames.Confidence(finding.Confidence);
         // Summary/Limitations come straight from ConnectionDiagnosticUseCase.Classify
-        // (Domain layer) and stay in English for now - that text is deeply covered by
-        // exact-string test assertions across NetPulse.UnitTests; translating it is a
-        // separate, larger pass, not part of this UI-chrome translation.
+        // (Domain layer) - now in Spanish there too; see that file's own history for why
+        // this was previously deferred (it turned out only finding.Id was test-asserted,
+        // never this prose, so the translation pass was much smaller than expected).
         Summary = finding.Summary;
         Median = $"{stats.Median.TotalMilliseconds:F1} ms";
         P95 = $"{stats.P95.TotalMilliseconds:F1} ms";

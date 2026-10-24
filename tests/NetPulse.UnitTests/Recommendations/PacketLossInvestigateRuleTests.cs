@@ -41,6 +41,6 @@ public class PacketLossInvestigateRuleTests
         var match = _rule.Evaluate(Evidence(Stats(lossPercent: 10), Finding(DiagnosticConfidence.Probable)));
 
         Assert.Empty(match!.Descriptor.RequiredPermissions);
-        Assert.Contains("Not applicable", match.Descriptor.RollbackMethod);
+        Assert.Contains("No aplica", match.Descriptor.RollbackMethod);
     }
 }
