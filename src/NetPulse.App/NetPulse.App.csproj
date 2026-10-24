@@ -6,6 +6,16 @@
     <ProjectReference Include="..\NetPulse.Infrastructure.Windows\NetPulse.Infrastructure.Windows.csproj" />
     <ProjectReference Include="..\NetPulse.Persistence\NetPulse.Persistence.csproj" />
     <ProjectReference Include="..\NetPulse.PrivilegedAgent\NetPulse.PrivilegedAgent.csproj" />
+    <!-- Not a real assembly dependency (App never calls into Host's code - it launches it
+         as a separate elevated process, see ElevatedHelperOperationLauncher) - this
+         reference exists only so building App also builds Host and the target below can
+         copy its output next to App's. Without this, a plain `dotnet run`/`dotnet build`
+         of NetPulse.App alone never produces NetPulse.PrivilegedAgent.Host.exe in its own
+         output folder (only `installer\build.ps1`'s separate publish step did), so every
+         privileged action (DNS change, pktmon capture) would fail with "Elevated helper
+         not found" for anyone running from source instead of an installed copy. -->
+    <ProjectReference Include="..\NetPulse.PrivilegedAgent.Host\NetPulse.PrivilegedAgent.Host.csproj"
+                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,5 +30,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <Target Name="CopyPrivilegedAgentHostOutput" AfterTargets="Build">
+    <ItemGroup>
+      <PrivilegedAgentHostOutput Include="..\NetPulse.PrivilegedAgent.Host\bin\$(Configuration)\net10.0-windows\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PrivilegedAgentHostOutput)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>
